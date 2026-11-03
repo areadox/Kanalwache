@@ -16,6 +16,7 @@ Ein eigener Twitch-Viewer für Windows: dein Kanal und deine Lieblingskanäle an
 - Optional **Autostart mit Windows** (startet versteckt im Infobereich)
 - **Giveaway-Helfer**: erkennt Giveaways in deinen Lieblingskanälen und lässt dich mit einem Klick teilnehmen, mit selbst festlegbaren Erkennungswörtern (siehe unten)
 - **Kanalpunkte**: holt den Bonus in offenen Streams automatisch ab, zeigt den Kontostand und öffnet mit einem Klick die Belohnungen zum Einlösen (siehe unten)
+- **Favoriten** ★ in einer eigenen Leiste unter den Tabs, mit Alt+1–9 und Alt+←/→ schnell durchschalten (siehe unten)
 - **Gefolgte Kanäle übernehmen**: alle Kanäle, denen du folgst, mit einem Klick in die Liste – auf Wunsch laufend abgeglichen (siehe unten)
 - **Aufnahme**: Streams als Video aufnehmen – nur in Kanälen, in denen du Mod bist (siehe unten)
 - **Moderation**: erkennt, wo du Mod bist, und öffnet dort mit einem Klick Twitchs Mod-Ansicht – für deinen eigenen Kanal den Stream-Manager (siehe unten)
@@ -65,10 +66,25 @@ In jedem offenen Stream-Tab schaut Kanalwache alle 15 Sekunden nach, ob der Bonu
 
 ### Belohnungen einlösen
 
-Oben rechts im Stream-Tab zeigt der Knopf **🪙 Kontostand · Belohnungen** deine Kanalpunkte. Ein Klick (oder **Strg+Umschalt+P**, oder Rechtsklick auf den Tab → *Kanalpunkte-Belohnungen*) öffnet Twitchs Belohnungsmenü im Chat – dort löst du ein wie auf twitch.tv, mit allem, was dazugehört (Texteingabe, Emote freischalten, hervorgehobene Nachricht …).
+Rechts in der zweiten Leiste zeigt der Knopf **🪙 Kontostand · Belohnungen** deine Kanalpunkte. Ein Klick (oder **Strg+Umschalt+P**, oder Rechtsklick auf den Tab → *Kanalpunkte-Belohnungen*) öffnet Twitchs Belohnungsmenü im Chat – dort löst du ein wie auf twitch.tv, mit allem, was dazugehört (Texteingabe, Emote freischalten, hervorgehobene Nachricht …).
 
 - Ist der Chat ausgeblendet oder sehr schmal, blendet Kanalwache ihn dafür ein und macht ihn breit genug.
 - Der Knopf wird aktiv, sobald der Chat geladen ist und der Kanal Kanalpunkte nutzt (dein eigener Kanal hat keinen).
+
+## Favoriten
+
+Mit dem **Stern ☆** machst du einen Kanal zum Favoriten: in der Kanalliste beim Drüberfahren, per Rechtsklick auf einen Tab oder mit **Strg+D** im gerade offenen Stream. Favoriten haben in der Liste einen kleinen gelben Stern.
+
+Alle Favoriten stehen in der **Favoritenleiste** – der zweiten Leiste direkt unter den Tabs –, nummeriert und mit Live-Punkt:
+
+- **Klick** öffnet den Stream bzw. wechselt zum Tab, **Mittelklick** schließt den offenen Tab.
+- **Ziehen** ändert die Reihenfolge (und damit die Nummern), **Rechtsklick**: nach links/rechts, Tab schließen, aus den Favoriten entfernen.
+- **Alt+1 … Alt+9** springt direkt zum Favoriten Nr. 1–9 (öffnet ihn auch, wenn er offline ist).
+- **Alt+→ / Alt+←** schaltet nur zwischen den Favoriten durch, die gerade live sind oder schon als Tab offen sind.
+- Vorne steht, wie viele Favoriten gerade live sind.
+- Ausblenden lässt sich die Leiste in den Einstellungen (*Favoritenleiste unter den Tabs anzeigen*).
+
+Rechts in derselben Leiste stehen die Werkzeuge des aktiven Tabs (Zuschauer/Mod-Ansicht, Kanalpunkte-Belohnungen, Chat ein/aus, Aufnehmen, neu laden, im Browser öffnen) – so bleibt die Tab-Leiste oben ganz für die Tabs frei. Bei schmalerem Fenster werden sie zu Symbolen.
 
 ## Tabs bedienen
 
@@ -101,6 +117,9 @@ Es ist immer nur **ein** Stream zu hören – der, den du gerade ansiehst. Alle 
 | Strg+M | aktiven Stream stumm / laut (bzw. Ton hierher holen) |
 | Strg+R / F5 | aktiven Tab neu laden |
 | Strg+K / Strg+Umschalt+A | Liste aller Tabs |
+| Alt+1 … Alt+9 | Favorit Nr. 1–9 |
+| Alt+→ / Alt+← | nächster / vorheriger Favorit (live oder offen) |
+| Strg+D | aktiven Stream zum Favoriten machen / entfernen |
 | Strg+Umschalt+R | Aufnahme starten / beenden (nur Mod-Kanäle) |
 | Strg+Umschalt+P | Kanalpunkte-Belohnungen öffnen |
 
@@ -111,7 +130,7 @@ Die Kürzel funktionieren auch, wenn gerade der Player oder Chat angeklickt ist.
 Ein Stream-Tab zeigt nur den **Twitch-Player** und rechts daneben den **Twitch-Chat** – ohne Menüs, Empfehlungen und Kanalinfos.
 
 - Die Chat-Breite lässt sich am Trenner zwischen Player und Chat verstellen (Doppelklick: Standardbreite); sie gilt für alle Tabs.
-- Das Sprechblasen-Symbol oben rechts blendet den Chat aus und wieder ein. Kanalpunkte werden auch bei ausgeblendetem Chat weiter abgeholt.
+- Das Sprechblasen-Symbol rechts in der zweiten Leiste blendet den Chat aus und wieder ein. Kanalpunkte werden auch bei ausgeblendetem Chat weiter abgeholt.
 - Wer lieber die vollständige Twitch-Seite hat: Einstellungen → *Ganze Twitch-Seite zeigen statt nur Stream und Chat*.
 - Mod-Ansicht und Stream-Manager zeigen weiterhin die jeweilige Twitch-Seite.
 - Chat und alle Twitch-Seiten in Kanalwache erscheinen immer im **Dark Mode**.
@@ -119,7 +138,7 @@ Ein Stream-Tab zeigt nur den **Twitch-Player** und rechts daneben den **Twitch-C
 
 ## Aufnahme (nur Mod-Kanäle)
 
-In Kanälen, in denen du **Moderator** bist, gibt es im Stream-Tab oben rechts den Knopf **● Aufnehmen**. In allen anderen Kanälen (und in deinem eigenen) gibt es ihn nicht – Kanalwache prüft den Mod-Status auch beim Start der Aufnahme noch einmal.
+In Kanälen, in denen du **Moderator** bist, gibt es rechts in der zweiten Leiste den Knopf **● Aufnehmen**. In allen anderen Kanälen (und in deinem eigenen) gibt es ihn nicht – Kanalwache prüft den Mod-Status auch beim Start der Aufnahme noch einmal.
 
 - Aufgenommen werden Bild und Ton des Players (bis 1080p, 30 Bilder/s) als **MP4 (H.264)**. Die Datei wird laufend geschrieben, auch sehr lange Aufnahmen belegen keinen Arbeitsspeicher.
 - Während der Aufnahme zeigt der Knopf Laufzeit und Dateigröße, der Tab ein rotes **REC**. Ein Klick (oder **Strg+Umschalt+R**, oder Rechtsklick → *Aufnahme beenden*) beendet und speichert; die Meldung danach hat einen Knopf **Im Ordner zeigen**.
@@ -146,7 +165,7 @@ Nach der Anmeldung holt **Gefolgte Kanäle übernehmen …** (unter der Kanallis
 Kanalwache erkennt automatisch, auf welchen deiner Kanäle du Moderator bist – über deinen Twitch-Login und zusätzlich über den Chat, sobald der Kanal live ist.
 
 - In der Seitenleiste steht bei diesen Kanälen ein grünes **🛡 Mod**, in der Übersicht hat die Live-Karte einen **Mod**-Knopf.
-- Im Stream-Tab schaltet oben rechts **Zuschauer | Mod-Ansicht** um. Die Mod-Ansicht ist Twitchs eigene Moderator-Oberfläche mit Chat, Mod-Aktionen, Nutzer-Infos, AutoMod-Warteschlange und Aktivitäts-Feed – alle Moderations-Werkzeuge, die Twitch bietet.
+- Rechts in der zweiten Leiste schaltet **Zuschauer | Mod-Ansicht** um. Die Mod-Ansicht ist Twitchs eigene Moderator-Oberfläche mit Chat, Mod-Aktionen, Nutzer-Infos, AutoMod-Warteschlange und Aktivitäts-Feed – alle Moderations-Werkzeuge, die Twitch bietet.
 - Mit dem **Schild-Symbol** am Kanal (erscheint beim Drüberfahren) legst du fest, dass der Kanal beim Live-Gehen gleich in der Mod-Ansicht geöffnet wird – zusammen mit dem Augen-Symbol.
 - Für deinen **eigenen Kanal** (wenn du mit diesem Account angemeldet bist) gibt es statt der Mod-Ansicht **Zuschauer | Stream-Manager**.
 - Wird ein Mod-Status nicht erkannt, hilft es meist, den Kanal einmal zu öffnen, während er live ist.

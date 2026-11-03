@@ -85,6 +85,12 @@ async function syncFollows(): Promise<void> {
   }
 }
 
+/** Favoriten, die noch in deiner Kanalliste stehen (entfernte Kanäle fallen raus) */
+function starredList(): string[] {
+  const have = new Set(store.allLogins());
+  return store.config.starred.filter((l) => have.has(l));
+}
+
 // ---------- Moderation ----------
 
 /** Mod-Status laut Twitch-Abfrage (null = Abfrage hat nicht geklappt) */
@@ -421,8 +427,16 @@ function createWindow(): void {
 
 /** Tastenkürzel für die Tab-Navigation (wie im Browser) */
 function shortcutFor(input: Electron.Input): string | null {
-  if (input.type !== 'keyDown' || input.alt) return null;
+  if (input.type !== 'keyDown') return null;
   const ctrl = input.control || input.meta;
+  // Alt + Pfeil / Zahl: nur durch die Favoriten schalten
+  if (input.alt) {
+    if (ctrl || input.shift) return null;
+    if (input.code === 'ArrowRight') return 'favnext';
+    if (input.code === 'ArrowLeft') return 'favprev';
+    const fav = input.code.match(/^(?:Digit|Numpad)([1-9])$/);
+    return fav ? `fav${fav[1]}` : null;
+  }
   if (!ctrl) return input.code === 'F5' ? 'reload' : null;
   const c = input.code;
   if (c === 'Tab') return input.shift ? 'prev' : 'next';
@@ -438,6 +452,7 @@ function shortcutFor(input: Electron.Input): string | null {
   const digit = c.match(/^(?:Digit|Numpad)([1-9])$/);
   if (digit) return `go${digit[1]}`;
   if (c === 'KeyW') return 'close';
+  if (c === 'KeyD') return 'star';
   if (c === 'KeyM') return 'mute';
   if (c === 'KeyK') return 'tablist';
   if (c === 'KeyR') return 'reload';
@@ -630,6 +645,7 @@ function buildState() {
     checking,
     giveaways: detector.list(),
     mods: modChannels(),
+    starred: starredList(),
     broadcaster: ownBroadcasterLogin(),
     giveawayRules: store.config.giveawayRules,
     defaultRules: DEFAULT_RULES,
@@ -717,6 +733,13 @@ function registerIpc(): void {
     if (p.autoOpen === true && statuses.get(cfg.login)?.live) openChannel(cfg.login, true);
   });
 
+  ipcMain.handle('set-starred', (_e, list: unknown) => {
+    if (!Array.isArray(list)) return;
+    const have = new Set(store.allLogins());
+    store.config.starred = [...new Set(list.map((x) => (typeof x === 'string' ? normalizeLogin(x) : null)).filter((x): x is string => !!x && have.has(x)))];
+    saveAndPush(false);
+  });
+
   ipcMain.handle('move-channel', (_e, login: unknown, dir: unknown) => {
     const list = store.config.favorites;
     const i = list.findIndex((f) => f.login === login);
@@ -744,7 +767,7 @@ function registerIpc(): void {
     if (!patch || typeof patch !== 'object') return;
     const p = patch as Partial<Settings>;
     const s = store.config.settings;
-    for (const key of ['closeToTray', 'startInTray', 'autostart', 'muteAutoOpened', 'closeTabWhenOffline', 'giveawayHelper', 'giveawayNotify', 'autoClaimPoints', 'syncFollows', 'followNotify', 'followAutoOpen', 'fullPage', 'singleAudio'] as const) {
+    for (const key of ['closeToTray', 'startInTray', 'autostart', 'muteAutoOpened', 'closeTabWhenOffline', 'giveawayHelper', 'giveawayNotify', 'autoClaimPoints', 'syncFollows', 'followNotify', 'followAutoOpen', 'fullPage', 'singleAudio', 'showFavBar'] as const) {
       if (typeof p[key] === 'boolean') s[key] = p[key] as boolean;
     }
     if (typeof p.pollSeconds === 'number') s.pollSeconds = clampPoll(p.pollSeconds);

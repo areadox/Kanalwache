@@ -31,6 +31,8 @@ export interface Settings {
   fullPage: boolean;
   /** Ton nur aus einem Tab: dem aktiven Stream (bzw. dem zuletzt aktiven) */
   singleAudio: boolean;
+  /** Favoritenleiste unter den Tabs anzeigen */
+  showFavBar: boolean;
   /** Aufnahmen: Zielordner (leer = Videos\\Kanalwache) und Qualität */
   recordDir: string;
   recordQuality: 'high' | 'medium' | 'low';
@@ -48,6 +50,8 @@ export interface Config {
   giveawayRules: GiveawayRules;
   /** Gefolgte Kanäle, die du nicht übernehmen wolltest oder entfernt hast – der Abgleich lässt sie weg */
   ignoredFollows: string[];
+  /** Favoriten (★) in deiner Reihenfolge – erscheinen in der Favoritenleiste */
+  starred: string[];
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -63,6 +67,7 @@ export const DEFAULT_SETTINGS: Settings = {
   syncFollows: false,
   fullPage: false,
   singleAudio: true,
+  showFavBar: true,
   recordDir: '',
   recordQuality: 'high',
   followNotify: true,
@@ -129,6 +134,9 @@ export class Store {
       favorites,
       settings,
       giveawayRules: sanitizeRules(raw.giveawayRules),
+      starred: Array.isArray(raw.starred)
+        ? [...new Set((raw.starred as unknown[]).map((x) => (typeof x === 'string' ? normalizeLogin(x) : null)).filter((x): x is string => !!x))]
+        : [],
       ignoredFollows: Array.isArray(raw.ignoredFollows)
         ? [...new Set((raw.ignoredFollows as unknown[]).map((x) => (typeof x === 'string' ? normalizeLogin(x) : null)).filter((x): x is string => !!x))]
         : [],

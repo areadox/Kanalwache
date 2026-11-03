@@ -42,6 +42,10 @@
 
   <main>
     <nav id="tabbar"></nav>
+    <div id="subbar" class="favbar" hidden>
+      <nav id="favbar" class="fav-zone" aria-label="Favoriten"></nav>
+      <div id="tab-tools-zone" class="tools-zone"></div>
+    </div>
     <div id="tab-list" class="tab-list" hidden>
       <input placeholder="Tab suchen …" spellcheck="false" autocomplete="off" aria-label="Tab suchen">
       <div id="tab-list-items" class="tl-items" role="listbox"></div>
@@ -81,6 +85,7 @@
       <label class="row"><input type="checkbox" data-setting="syncFollows"> Automatisch abgleichen: neue Follows hinzufügen, entfolgte entfernen</label>
       <div class="row"><button type="button" class="btn small" id="btn-follows-2">Gefolgte Kanäle übernehmen …</button></div>
       <h3>Streams &amp; Fenster</h3>
+      <label class="row"><input type="checkbox" data-setting="showFavBar"> Favoritenleiste unter den Tabs anzeigen</label>
       <label class="row"><input type="checkbox" data-setting="singleAudio"> Ton nur aus einem Tab – dem Stream, den du gerade ansiehst</label>
       <label class="row"><input type="checkbox" data-setting="fullPage"> Ganze Twitch-Seite zeigen statt nur Stream und Chat</label>
       <label class="row"><input type="checkbox" data-setting="muteAutoOpened"> Automatisch geöffnete Streams stumm starten</label>

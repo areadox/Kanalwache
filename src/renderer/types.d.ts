@@ -32,6 +32,7 @@ interface AppSettings {
   syncFollows: boolean;
   fullPage: boolean;
   singleAudio: boolean;
+  showFavBar: boolean;
   recordDir: string;
   recordQuality: 'high' | 'medium' | 'low';
   followNotify: boolean;
@@ -103,6 +104,8 @@ interface AppState {
   defaultRules: GiveawayRules;
   /** Kanäle, auf denen du Moderator bist */
   mods: string[];
+  /** Favoriten in deiner Reihenfolge */
+  starred: string[];
   /** Dein eigener Kanal, wenn du mit diesem Account angemeldet bist */
   broadcaster: string | null;
 }
@@ -154,6 +157,7 @@ interface KanalwacheApi {
   onRecError(cb: (id: string, msg: string) => void): void;
   onStopAllRecordings(cb: () => void): void;
   onShortcut(cb: (name: string) => void): void;
+  setStarred(list: string[]): Promise<void>;
   testGiveawayMessage(text: string, privileged: boolean): Promise<TestResult | null>;
 }
 

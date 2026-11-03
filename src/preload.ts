@@ -31,6 +31,7 @@ contextBridge.exposeInMainWorld('kanalwache', {
   recShowFile: (file: string) => ipcRenderer.invoke('rec-show-file', file),
   onRecError: (cb: (id: string, msg: string) => void) => ipcRenderer.on('rec-error', (_e, id, m) => cb(id, m)),
   onStopAllRecordings: (cb: () => void) => ipcRenderer.on('stop-all-recordings', () => cb()),
+  setStarred: (list: string[]) => ipcRenderer.invoke('set-starred', list),
   onShortcut: (cb: (name: string) => void) => ipcRenderer.on('shortcut', (_e, n) => cb(n)),
   setGiveawayRules: (rules: unknown) => ipcRenderer.invoke('set-giveaway-rules', rules),
   testGiveawayMessage: (text: string, privileged: boolean) => ipcRenderer.invoke('test-giveaway-message', text, privileged),

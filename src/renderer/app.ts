@@ -46,6 +46,7 @@ const ICONS = {
   right: '<svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>',
   list: '<svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>',
   record: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5" fill="currentColor"/></svg>',
+  star: '<svg viewBox="0 0 24 24"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9L12 3.5Z"/></svg>',
   home: '<svg viewBox="0 0 24 24"><path d="M4 11 12 4l8 7v9h-5v-6H9v6H4v-9Z"/></svg>',
 };
 
@@ -563,13 +564,16 @@ function renderTabBar(): void {
 
   const parts: Child[] = [fixed, h('span', { class: 'tab-sep' }), leftBtn, scroller, rightBtn, listBtn];
 
+  // Werkzeuge des aktiven Tabs stehen in der zweiten Leiste (rechts neben den Favoriten)
+  const toolsZone = document.getElementById('tab-tools-zone')!;
+  toolsZone.replaceChildren();
   const active = tabs.get(activeId);
   if (active) {
     const login = active.login;
     const second: ViewMode | null = !login || active.kind !== 'stream'
       ? null
       : isBroadcaster(login) ? 'manager' : isMod(login) || active.mode === 'mod' ? 'mod' : null;
-    parts.push(
+    toolsZone.append(
       h('div', { class: 'tab-tools' },
         second
           ? h('div', { class: 'seg', role: 'group', 'aria-label': 'Ansicht' },
@@ -627,6 +631,7 @@ function renderTabBar(): void {
   lastShownActive = activeId;
   updateScrollButtons();
   if (tabListOpen) renderTabList();
+  renderFavBar();
 }
 
 // ---------- Ton: nur ein Tab ----------
@@ -732,6 +737,9 @@ function showTabMenu(t: Tab, x: number, y: number): void {
       icon: (muted ? 'volume' : 'mute') as keyof typeof ICONS, hint: 'Strg+M', onClick: () => toggleMute(t),
     }] : []),
     { label: 'Im Browser öffnen', icon: 'external', onClick: () => openTabExternal(t) },
+    ...(t.kind === 'stream' && t.login && channelByLogin(t.login)
+      ? [{ label: isStarred(t.login) ? 'Aus den Favoriten entfernen' : 'Zu den Favoriten', icon: 'star' as keyof typeof ICONS, hint: 'Strg+D', onClick: () => toggleStar(t.login!) }]
+      : []),
     ...(t.kind === 'stream' && t.mode === 'viewer' && t.balance
       ? [{ label: 'Kanalpunkte-Belohnungen', icon: 'coin' as keyof typeof ICONS, hint: 'Strg+Umschalt+P', onClick: () => void openRewards(t) }]
       : []),
@@ -764,6 +772,8 @@ function toggleTabList(force?: boolean): void {
   tabListOpen = force ?? !tabListOpen;
   const panel = document.getElementById('tab-list')!;
   panel.hidden = !tabListOpen;
+  const sub = document.getElementById('subbar')!;
+  panel.style.top = `${document.getElementById('tabbar')!.offsetHeight + (sub.hidden ? 0 : sub.offsetHeight) + 4}px`;
   if (tabListOpen) {
     const input = panel.querySelector<HTMLInputElement>('input')!;
     input.value = '';
@@ -861,6 +871,151 @@ function setupTabList(): void {
   });
 }
 
+// ---------- Favoriten ----------
+
+function starred(): string[] {
+  return state?.starred ?? [];
+}
+
+function isStarred(login: string): boolean {
+  return starred().includes(login);
+}
+
+function setStarred(list: string[]): void {
+  if (state) state.starred = list;
+  renderFavBar();
+  renderSidebar();
+  void api.setStarred(list);
+}
+
+function toggleStar(login: string): void {
+  const list = starred();
+  if (list.includes(login)) {
+    setStarred(list.filter((l) => l !== login));
+    toast(`${nameOf(login)} ist kein Favorit mehr.`);
+  } else {
+    setStarred([...list, login]);
+    toast(`${nameOf(login)} ist jetzt Favorit – Alt+${Math.min(list.length + 1, 9)}${list.length >= 9 ? ' (bzw. Alt+←/→)' : ''}.`);
+  }
+}
+
+function moveStar(login: string, to: number): void {
+  const list = starred().filter((l) => l !== login);
+  list.splice(Math.max(0, Math.min(to, list.length)), 0, login);
+  setStarred(list);
+}
+
+/** Durchschalten nur zwischen Favoriten, die live sind oder schon offen. */
+function cycleFavorites(dir: 1 | -1): void {
+  const list = starred().filter((l) => channelByLogin(l)?.status?.live || tabs.has(`stream:${l}`));
+  if (!list.length) {
+    toast(starred().length ? 'Gerade ist keiner deiner Favoriten live.' : 'Noch keine Favoriten – Stern am Kanal klicken oder Strg+D im Stream.');
+    return;
+  }
+  const cur = tabs.get(activeId)?.login ?? null;
+  const idx = cur ? list.indexOf(cur) : -1;
+  const next = idx < 0 ? (dir === 1 ? 0 : list.length - 1) : (idx + dir + list.length) % list.length;
+  openStream(list[next], { auto: false, muted: false, focus: true });
+}
+
+let favScroll = 0;
+
+function renderFavBar(): void {
+  const bar = document.getElementById('favbar');
+  if (!bar || !state) return;
+  const list = starred();
+  const show = state.settings.showFavBar && list.length > 0;
+  const old = bar.querySelector<HTMLElement>('.fav-scroll');
+  if (old) favScroll = old.scrollLeft;
+  const sub = document.getElementById('subbar')!;
+  const updateSub = () => { sub.hidden = !show && !document.getElementById('tab-tools-zone')!.childElementCount; };
+  if (!show) {
+    bar.replaceChildren();
+    updateSub();
+    return;
+  }
+  const scroller = h('div', { class: 'fav-scroll' });
+  list.forEach((login, i) => {
+    const c = channelByLogin(login);
+    if (!c) return;
+    const s = c.status;
+    const open = tabs.has(`stream:${login}`);
+    const active = activeId === `stream:${login}`;
+    const chip = h('button', {
+      type: 'button',
+      class: `fav-chip${s?.live ? ' live' : ' offline'}${open ? ' open' : ''}${active ? ' active' : ''}`,
+      draggable: 'true',
+      title: `${displayName(c)} – ${s?.live ? `live${s.viewers != null ? ` · ${fmtViewers(s.viewers)} Zuschauer` : ''}${s.game ? ` · ${s.game}` : ''}` : 'offline'}${i < 9 ? ` · Alt+${i + 1}` : ''}`,
+    },
+      i < 9 ? h('kbd', { class: 'fav-key', text: String(i + 1) }) : null,
+      avatar(c, 'xs'),
+      h('span', { class: 'fav-name', text: displayName(c) }),
+      s?.live ? h('span', { class: 'live-dot' }) : null,
+    );
+    chip.addEventListener('click', () => openStream(login, { auto: false, muted: false, focus: true }));
+    chip.addEventListener('auxclick', (e) => {
+      if ((e as MouseEvent).button === 1 && open) closeTab(`stream:${login}`);
+    });
+    chip.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      showMenu(e.clientX, e.clientY, [
+        { label: open ? 'Zum Tab wechseln' : 'Öffnen', icon: 'right', onClick: () => openStream(login, { auto: false, muted: false, focus: true }) },
+        { sep: true },
+        { label: 'Nach links', icon: 'left', disabled: i === 0, onClick: () => moveStar(login, i - 1) },
+        { label: 'Nach rechts', icon: 'right', disabled: i === list.length - 1, onClick: () => moveStar(login, i + 1) },
+        { sep: true },
+        ...(open ? [{ label: 'Tab schließen', icon: 'close' as keyof typeof ICONS, onClick: () => closeTab(`stream:${login}`) }] : []),
+        { label: 'Aus den Favoriten entfernen', icon: 'star', danger: true, onClick: () => toggleStar(login) },
+      ]);
+    });
+    // Umsortieren per Ziehen
+    chip.addEventListener('dragstart', (e) => {
+      e.dataTransfer?.setData('text/kw-fav', login);
+      chip.classList.add('dragging');
+    });
+    chip.addEventListener('dragend', () => {
+      chip.classList.remove('dragging');
+      bar.querySelectorAll('.drop-before, .drop-after').forEach((x) => x.classList.remove('drop-before', 'drop-after'));
+    });
+    chip.addEventListener('dragover', (e) => {
+      if (!e.dataTransfer?.types.includes('text/kw-fav')) return;
+      e.preventDefault();
+      const r = chip.getBoundingClientRect();
+      const before = e.clientX < r.left + r.width / 2;
+      chip.classList.toggle('drop-before', before);
+      chip.classList.toggle('drop-after', !before);
+    });
+    chip.addEventListener('dragleave', () => chip.classList.remove('drop-before', 'drop-after'));
+    chip.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const from = e.dataTransfer?.getData('text/kw-fav');
+      const before = chip.classList.contains('drop-before');
+      chip.classList.remove('drop-before', 'drop-after');
+      if (!from || from === login) return;
+      const without = list.filter((l) => l !== from);
+      const at = without.indexOf(login) + (before ? 0 : 1);
+      without.splice(at, 0, from);
+      setStarred(without);
+    });
+    scroller.append(chip);
+  });
+  scroller.addEventListener('wheel', (e) => {
+    const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    if (!d) return;
+    e.preventDefault();
+    scroller.scrollLeft += d;
+  }, { passive: false });
+  const liveCount = list.filter((l) => channelByLogin(l)?.status?.live).length;
+  bar.replaceChildren(
+    h('span', { class: 'fav-label', title: 'Favoriten: Alt+1–9 springt direkt hin, Alt+←/→ schaltet zwischen den Favoriten durch, die live oder offen sind. Strg+D: aktiven Stream zum Favoriten machen.' },
+      icon('star'), h('span', { text: liveCount ? `${liveCount}/${list.length} live` : 'Favoriten' })),
+    scroller,
+  );
+  scroller.scrollLeft = favScroll;
+  updateSub();
+  bar.querySelector('.fav-chip.active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
 // ---------- Tastenkürzel ----------
 
 const closedTabs: { login: string; mode: ViewMode; index: number }[] = [];
@@ -892,6 +1047,15 @@ function handleShortcut(name: string): void {
     if (active) reloadTab(active);
   } else if (name === 'tablist') {
     toggleTabList();
+  } else if (name === 'favnext' || name === 'favprev') {
+    cycleFavorites(name === 'favnext' ? 1 : -1);
+  } else if (/^fav[1-9]$/.test(name)) {
+    const login = starred()[Number(name.slice(3)) - 1];
+    if (login) openStream(login, { auto: false, muted: false, focus: true });
+    else toast(`Es gibt keinen Favoriten Nr. ${name.slice(3)}.`);
+  } else if (name === 'star') {
+    if (active?.kind === 'stream' && active.login && channelByLogin(active.login)) toggleStar(active.login);
+    else toast('Favorit wird man über den Stern am Kanal oder mit Strg+D in einem Stream-Tab.');
   } else if (name === 'rewards') {
     if (active?.kind === 'stream') void openRewards(active);
   } else if (name === 'record') {
@@ -924,7 +1088,9 @@ function channelRow(c: ChannelView, opts: { own: boolean; index?: number; count?
         ? h('button', { class: 'gift-flag', type: 'button', title: 'Giveaway läuft – anzeigen', onclick: (e: MouseEvent) => { e.stopPropagation(); activate('giveaways'); } }, icon('gift'))
         : null),
     h('div', { class: 'channel-text' },
-      h('span', { class: 'channel-name', text: displayName(c) }),
+      h('span', { class: 'channel-name' },
+        h('span', { class: 'cn-text', text: displayName(c) }),
+        isStarred(c.login) ? h('span', { class: 'cn-star', title: 'Favorit' }, icon('star')) : null),
       h('span', { class: 'channel-sub' },
         isMod(c.login) ? h('span', { class: 'mod-badge', title: 'Du bist hier Moderator' }, icon('shield'), 'Mod') : null,
         isMod(c.login) ? ' · ' : null,
@@ -936,6 +1102,10 @@ function channelRow(c: ChannelView, opts: { own: boolean; index?: number; count?
         e.stopPropagation();
         void api.updateChannel(c.login, { notify: !c.notify });
       }, c.notify ? 'on' : 'off'),
+      iconButton('star', isStarred(c.login) ? 'Aus den Favoriten entfernen' : 'Zu den Favoriten (Favoritenleiste, Alt+←/→)', (e) => {
+        e.stopPropagation();
+        toggleStar(c.login);
+      }, isStarred(c.login) ? 'star-on hover-only' : 'off hover-only'),
       iconButton('eye', c.autoOpen ? 'Nicht mehr automatisch zuschauen' : 'Automatisch zuschauen, wenn live', (e) => {
         e.stopPropagation();
         void api.updateChannel(c.login, { autoOpen: !c.autoOpen });
