@@ -368,6 +368,7 @@ function closeTab(id: string, batch = false, recStopped = false): void {
   tabs.delete(id);
   if (batch) return;
   if (audioTabId === id) audioTabId = null;
+  if (rwTabId === id) closeRewardsDrawer();
   if (activeId === id) {
     const rest = tabSequence();
     activate(rest[Math.min(idx, rest.length - 1)] ?? 'home');
@@ -378,6 +379,12 @@ const FIXED_VIEWS = ['home', 'giveaways'];
 
 function activate(id: string): void {
   activeId = tabs.has(id) || FIXED_VIEWS.includes(id) ? id : 'home';
+  // Offenes Belohnungsmenü folgt dem aktiven Stream
+  if (rwTabId && rwTabId !== activeId) {
+    const next = tabs.get(activeId);
+    if (next?.kind === 'stream' && next.mode === 'viewer' && next.login !== state?.own?.login) openRewardsDrawer(next);
+    else closeRewardsDrawer();
+  }
   // Ton folgt dem aktiven Stream; auf Übersicht/Giveaways läuft der bisherige weiter
   if (singleAudio() && tabs.get(activeId)?.kind === 'stream' && audioTabId !== activeId) setAudioTab(activeId, false);
   for (const v of FIXED_VIEWS) document.getElementById(`view-${v}`)!.classList.toggle('active', activeId === v);
@@ -589,12 +596,12 @@ function renderTabBar(): void {
         active.kind === 'stream' && active.mode === 'viewer' && active.login !== state?.own?.login
           ? h('button', {
               type: 'button',
-              class: 'pts-btn',
+              class: `pts-btn${rwTabId === active.id ? ' on' : ''}`,
               disabled: !active.balance,
               title: active.balance
                 ? `Kanalpunkte: ${active.balance} – Belohnungen anzeigen und einlösen (Strg+Umschalt+P)`
                 : 'Kanalpunkte-Belohnungen – sobald der Chat geladen ist (gibt es nur, wenn der Kanal Kanalpunkte nutzt und du angemeldet bist)',
-              onclick: () => void openRewards(active),
+              onclick: () => toggleRewardsDrawer(active),
             }, icon('coin'), h('span', { text: active.balance ?? '–' }), h('span', { class: 'pts-btn-label', text: 'Belohnungen' }))
           : null,
         isCompact(active)
@@ -741,7 +748,7 @@ function showTabMenu(t: Tab, x: number, y: number): void {
       ? [{ label: isStarred(t.login) ? 'Aus den Favoriten entfernen' : 'Zu den Favoriten', icon: 'star' as keyof typeof ICONS, hint: 'Strg+D', onClick: () => toggleStar(t.login!) }]
       : []),
     ...(t.kind === 'stream' && t.mode === 'viewer' && t.balance
-      ? [{ label: 'Kanalpunkte-Belohnungen', icon: 'coin' as keyof typeof ICONS, hint: 'Strg+Umschalt+P', onClick: () => void openRewards(t) }]
+      ? [{ label: 'Kanalpunkte-Belohnungen', icon: 'coin' as keyof typeof ICONS, hint: 'Strg+Umschalt+P', onClick: () => openRewardsDrawer(t) }]
       : []),
     ...(t.rec || canRecord(t)
       ? [{ label: t.rec ? 'Aufnahme beenden' : 'Aufnahme starten', icon: 'record' as keyof typeof ICONS, hint: 'Strg+Umschalt+R', onClick: () => void toggleRecording(t) }]
@@ -867,7 +874,7 @@ function setupTabList(): void {
     }, 0);
   });
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { closeMenu(); if (tabListOpen) toggleTabList(false); }
+    if (e.key === 'Escape') { closeMenu(); if (tabListOpen) toggleTabList(false); else if (rwTabId) closeRewardsDrawer(); }
   });
 }
 
@@ -1057,7 +1064,7 @@ function handleShortcut(name: string): void {
     if (active?.kind === 'stream' && active.login && channelByLogin(active.login)) toggleStar(active.login);
     else toast('Favorit wird man über den Stern am Kanal oder mit Strg+D in einem Stream-Tab.');
   } else if (name === 'rewards') {
-    if (active?.kind === 'stream') void openRewards(active);
+    if (active?.kind === 'stream') toggleRewardsDrawer(active);
   } else if (name === 'record') {
     if (active && (active.rec || canRecord(active))) void toggleRecording(active);
     else toast('Aufnehmen geht nur in Stream-Tabs von Kanälen, in denen du Mod bist.');
@@ -1615,6 +1622,276 @@ const REWARDS_JS = `(() => {
   return 'ok';
 })()`;
 
+// ---------- Belohnungsmenü (von rechts) ----------
+
+let rwTabId: string | null = null;
+let rwLoading = false;
+let rwError: string | null = null;
+let rwData: { rewards: ChannelReward[]; balance: number | null; pointsName: string | null; pointsIcon: string | null } | null = null;
+let rwSel: string | null = null;
+let rwInput = '';
+let rwBusy = false;
+let rwDone: string | null = null;
+
+/** Löst eine Belohnung über Twitchs eigenes Menü im Chat ein (dort laufen Twitchs Prüfungen). */
+const REDEEM_FN = `async (title, input) => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const norm = (s) => (s || '').replace(/\\s+/g, ' ').trim().toLowerCase();
+  const summary = document.querySelector('[data-test-selector="community-points-summary"]');
+  if (!summary) return 'no-points';
+  const isBonus = (b) => !!b.querySelector('.claimable-bonus__icon') || /bonus|claim|abholen|einfordern/i.test(b.getAttribute('aria-label') || '');
+  const main = Array.from(summary.querySelectorAll('button')).find((b) => !isBonus(b));
+  const log = document.querySelector('[data-test-selector="chat-scrollable-area__message-container"], .chat-scrollable-area__message-container');
+  const outsideChat = (el) => !(log && log.contains(el)) && !summary.contains(el);
+  const want = norm(title);
+  const findReward = () => Array.from(document.querySelectorAll('button, [role="button"]'))
+    .filter((el) => outsideChat(el) && norm(el.textContent).includes(want))
+    .sort((a, b) => norm(a.textContent).length - norm(b.textContent).length)[0] || null;
+  let reward = findReward();
+  if (!reward && main) {
+    main.click();
+    for (let i = 0; i < 25 && !reward; i++) { await sleep(150); reward = findReward(); }
+  }
+  if (!reward) return 'not-found';
+  reward.click();
+  await sleep(350);
+  if (input) {
+    let ta = null;
+    for (let i = 0; i < 20 && !ta; i++) {
+      ta = Array.from(document.querySelectorAll('textarea')).find((t) => outsideChat(t) && t.getAttribute('data-a-target') !== 'chat-input') || null;
+      if (!ta) await sleep(150);
+    }
+    if (!ta) return 'no-input';
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set;
+    setter.call(ta, input);
+    ta.dispatchEvent(new Event('input', { bubbles: true }));
+    await sleep(250);
+  }
+  let btn = null;
+  for (let i = 0; i < 25 && !btn; i++) {
+    btn = Array.from(document.querySelectorAll('button')).find((b) => outsideChat(b) && b !== reward && /einlösen|redeem/i.test(b.textContent || '') && !b.disabled) || null;
+    if (!btn) await sleep(150);
+  }
+  if (!btn) return 'no-confirm';
+  btn.click();
+  await sleep(900);
+  const err = Array.from(document.querySelectorAll('[role="alert"], [class*="error"]')).map((e) => (e.textContent || '').trim()).find((t) => t.length > 3 && t.length < 200);
+  return err ? 'error:' + err : 'ok';
+}`;
+
+/** Farbige Kachel der Belohnung (Farbe per CSSOM, inline-style ist per CSP gesperrt) */
+function tileFor(r: ChannelReward): HTMLElement {
+  const tile = h('span', { class: 'rw-tile' }, r.image ? h('img', { src: r.image, alt: '' }) : icon('coin'));
+  if (r.color) tile.style.background = r.color;
+  return tile;
+}
+
+function parseBalance(s: string | null): number | null {
+  if (!s) return null;
+  const m = s.replace(/\s/g, '').match(/^([\d.,]+)([KkMm]?)/);
+  if (!m) return null;
+  const mult = /k/i.test(m[2]) ? 1e3 : /m/i.test(m[2]) ? 1e6 : 1;
+  // „12,3K“ → 12.3 × 1000; „1.204“ → 1204
+  const num = mult > 1 ? Number(m[1].replace(',', '.')) : Number(m[1].replace(/[.,]/g, ''));
+  return Number.isFinite(num) ? Math.round(num * mult) : null;
+}
+
+function rwBalance(t: Tab | undefined): number | null {
+  return rwData?.balance ?? parseBalance(t?.balance ?? null);
+}
+
+function toggleRewardsDrawer(t: Tab): void {
+  if (rwTabId === t.id) closeRewardsDrawer();
+  else openRewardsDrawer(t);
+}
+
+function openRewardsDrawer(t: Tab): void {
+  if (t.kind !== 'stream' || !t.login) return;
+  if (!state?.auth.loggedIn) {
+    toast('Für Kanalpunkte-Belohnungen musst du bei Twitch angemeldet sein.');
+    return;
+  }
+  if (t.id !== activeId) {
+    rwTabId = t.id; // verhindert, dass activate() das Menü schließt
+    activate(t.id);
+  }
+  const changed = rwTabId !== t.id || !rwData;
+  rwTabId = t.id;
+  if (changed) {
+    rwSel = null;
+    rwInput = '';
+    rwDone = null;
+  }
+  document.getElementById('rewards-drawer')!.classList.add('open');
+  document.getElementById('rewards-drawer')!.setAttribute('aria-hidden', 'false');
+  document.getElementById('rw-backdrop')!.hidden = false;
+  renderRewardsDrawer();
+  void loadRewards(t, false);
+}
+
+function closeRewardsDrawer(): void {
+  rwTabId = null;
+  rwSel = null;
+  const d = document.getElementById('rewards-drawer');
+  d?.classList.remove('open');
+  d?.setAttribute('aria-hidden', 'true');
+  const b = document.getElementById('rw-backdrop');
+  if (b) b.hidden = true;
+  renderTabBar();
+}
+
+async function loadRewards(t: Tab, force: boolean): Promise<void> {
+  if (!t.login) return;
+  rwLoading = true;
+  rwError = null;
+  if (force || rwTabId !== t.id) rwData = null;
+  renderRewardsDrawer();
+  const r = await api.getRewards(t.login, force);
+  if (rwTabId !== t.id) return;
+  rwLoading = false;
+  if (r.ok) {
+    rwData = { rewards: r.rewards ?? [], balance: r.balance ?? null, pointsName: r.pointsName ?? null, pointsIcon: r.pointsIcon ?? null };
+  } else {
+    rwError = r.error ?? 'Laden ging nicht.';
+    rwData = null;
+  }
+  renderRewardsDrawer();
+}
+
+function renderRewardsDrawer(): void {
+  const d = document.getElementById('rewards-drawer')!;
+  const t = rwTabId ? tabs.get(rwTabId) : undefined;
+  if (!t || !t.login) {
+    d.replaceChildren();
+    return;
+  }
+  const ch = channelByLogin(t.login);
+  const bal = rwBalance(t);
+  const pointsName = rwData?.pointsName || 'Kanalpunkte';
+  const head = h('header', { class: 'rw-head' },
+    ch ? avatar(ch) : null,
+    h('div', { class: 'rw-title' },
+      h('strong', { text: ch ? displayName(ch) : t.login }),
+      h('span', { class: 'rw-balance' },
+        rwData?.pointsIcon ? h('img', { src: rwData.pointsIcon, alt: '', class: 'rw-pts-icon' }) : icon('coin'),
+        h('span', { text: bal != null ? bal.toLocaleString('de-DE') : t.balance ?? '–' }),
+        h('span', { class: 'muted', text: pointsName }))),
+    iconButton('refresh', 'Neu laden', () => void loadRewards(t, true)),
+    iconButton('close', 'Schließen (Esc)', () => closeRewardsDrawer()),
+  );
+
+  const body = h('div', { class: 'rw-body' });
+  if (rwDone) body.append(h('div', { class: 'rw-done' }, icon('star'), h('span', { text: rwDone })));
+  if (rwLoading && !rwData) {
+    body.append(h('p', { class: 'muted rw-msg', text: 'Lade Belohnungen …' }));
+  } else if (rwError) {
+    body.append(
+      h('p', { class: 'gw-error rw-msg', text: rwError }),
+      h('p', { class: 'muted rw-msg', text: 'Du kannst Belohnungen trotzdem über Twitchs Menü im Chat einlösen:' }),
+    );
+  } else if (rwData && !rwData.rewards.length) {
+    body.append(h('p', { class: 'muted rw-msg', text: 'Dieser Kanal hat gerade keine eigenen Belohnungen.' }));
+  } else if (rwData) {
+    const grid = h('div', { class: 'rw-grid' });
+    for (const r of rwData.rewards) {
+      const tooExpensive = bal != null && r.cost > bal;
+      const blocked = r.paused || !r.inStock;
+      const sel = rwSel === r.id;
+      const card = h('button', {
+        type: 'button',
+        class: `rw-card${sel ? ' sel' : ''}${tooExpensive || blocked ? ' dim' : ''}`,
+        title: r.prompt ? `${r.title}\n\n${r.prompt}` : r.title,
+        disabled: rwBusy,
+        onclick: () => {
+          if (blocked) return toast(r.paused ? 'Diese Belohnung ist gerade pausiert.' : 'Diese Belohnung ist gerade ausverkauft.');
+          if (tooExpensive) return toast(`Dafür fehlen dir noch ${(r.cost - (bal ?? 0)).toLocaleString('de-DE')} ${pointsName}.`);
+          rwSel = sel ? null : r.id;
+          rwInput = '';
+          rwDone = null;
+          renderRewardsDrawer();
+          if (rwSel && r.needsInput) setTimeout(() => document.querySelector<HTMLTextAreaElement>('.rw-detail textarea')?.focus(), 0);
+        },
+      },
+        tileFor(r),
+        h('span', { class: 'rw-name', text: r.title }),
+        h('span', { class: 'rw-cost' }, icon('coin'), h('span', { text: r.cost.toLocaleString('de-DE') })),
+        blocked ? h('span', { class: 'rw-flag', text: r.paused ? 'Pausiert' : 'Ausverkauft' }) : r.needsInput ? h('span', { class: 'rw-flag text', text: 'Text' }) : null,
+      );
+      grid.append(card);
+    }
+    body.append(grid);
+  }
+
+  // Ausgewählte Belohnung: Bestätigen (und ggf. Text eingeben)
+  const r = rwData?.rewards.find((x) => x.id === rwSel);
+  let detail: HTMLElement | null = null;
+  if (r) {
+    const ta = r.needsInput ? h('textarea', { maxlength: '200', placeholder: 'Deine Nachricht an den Streamer', rows: '3' }) as HTMLTextAreaElement : null;
+    if (ta) {
+      ta.value = rwInput;
+      ta.addEventListener('input', () => {
+        rwInput = ta.value;
+        go.disabled = rwBusy || !rwInput.trim();
+      });
+    }
+    const go = h('button', {
+      type: 'button', class: 'btn primary rw-go',
+      disabled: rwBusy || (r.needsInput && !rwInput.trim()),
+      onclick: () => void redeemReward(t, r),
+    }, icon('coin'), h('span', { text: rwBusy ? 'Wird eingelöst …' : `Für ${r.cost.toLocaleString('de-DE')} einlösen` })) as HTMLButtonElement;
+    detail = h('div', { class: 'rw-detail' },
+      h('strong', { text: r.title }),
+      r.prompt ? h('p', { class: 'muted', text: r.prompt }) : null,
+      ta,
+      h('div', { class: 'rw-detail-actions' },
+        h('button', { type: 'button', class: 'btn', text: 'Abbrechen', disabled: rwBusy, onclick: () => { rwSel = null; renderRewardsDrawer(); } }),
+        go));
+  }
+
+  const foot = h('footer', { class: 'rw-foot' },
+    h('button', { type: 'button', class: 'link-btn', text: 'Twitchs Menü im Chat öffnen', onclick: () => { closeRewardsDrawer(); void openRewards(t); } }));
+  d.replaceChildren(head, body, ...(detail ? [detail] : []), foot);
+}
+
+async function redeemReward(t: Tab, r: ChannelReward): Promise<void> {
+  const target = t.chat ?? t.wv;
+  if (!(t.chat ? t.chatReady : t.ready)) {
+    toast('Der Chat lädt noch – gleich nochmal versuchen.');
+    return;
+  }
+  rwBusy = true;
+  renderRewardsDrawer();
+  let res = 'error';
+  try {
+    res = String(await target.executeJavaScript(`(${REDEEM_FN})(${JSON.stringify(r.title)}, ${JSON.stringify(r.needsInput ? rwInput.trim() : '')})`));
+  } catch {
+    res = 'error';
+  }
+  rwBusy = false;
+  if (res === 'ok') {
+    rwDone = `„${r.title}“ eingelöst.`;
+    rwSel = null;
+    rwInput = '';
+    toast(`„${r.title}“ eingelöst.`);
+    // Kontostand kurz danach neu holen
+    setTimeout(() => {
+      if (rwTabId === t.id) void loadRewards(t, true);
+      void claimPoints();
+    }, 2500);
+  } else {
+    const why: Record<string, string> = {
+      'no-points': 'Im Chat ist kein Kanalpunkte-Menü zu finden – ist der Chat fertig geladen?',
+      'not-found': 'Die Belohnung ist in Twitchs Menü nicht zu finden – vielleicht gerade nicht verfügbar.',
+      'no-input': 'Das Textfeld der Belohnung ist nicht aufgetaucht.',
+      'no-confirm': 'Der Einlösen-Knopf ist nicht aufgetaucht.',
+    };
+    const msg = res.startsWith('error:') ? `Twitch meldet: ${res.slice(6)}` : why[res] ?? 'Einlösen ging nicht.';
+    toast(`${msg} Ich öffne Twitchs Menü im Chat.`);
+    void openRewards(t);
+  }
+  renderRewardsDrawer();
+}
+
 async function openRewards(t: Tab): Promise<void> {
   if (t.kind !== 'stream' || t.mode !== 'viewer') return;
   if (!state?.auth.loggedIn) {
@@ -2160,6 +2437,7 @@ async function main(): Promise<void> {
   api.onShowGiveaways(() => activate('giveaways'));
   api.onShortcut(handleShortcut);
   setupRecording();
+  document.getElementById('rw-backdrop')!.addEventListener('click', () => closeRewardsDrawer());
   setupTabList();
   api.onToast(toast);
   setupFollowsDialog();

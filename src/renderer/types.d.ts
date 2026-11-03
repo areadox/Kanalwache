@@ -39,6 +39,19 @@ interface AppSettings {
   followAutoOpen: boolean;
 }
 
+interface ChannelReward {
+  id: string;
+  title: string;
+  cost: number;
+  prompt: string | null;
+  color: string | null;
+  image: string | null;
+  enabled: boolean;
+  paused: boolean;
+  inStock: boolean;
+  needsInput: boolean;
+}
+
 interface FollowedChannel {
   login: string;
   displayName: string;
@@ -157,6 +170,14 @@ interface KanalwacheApi {
   onRecError(cb: (id: string, msg: string) => void): void;
   onStopAllRecordings(cb: () => void): void;
   onShortcut(cb: (name: string) => void): void;
+  getRewards(login: string, force: boolean): Promise<{
+    ok: boolean;
+    error?: string;
+    rewards?: ChannelReward[];
+    balance?: number | null;
+    pointsName?: string | null;
+    pointsIcon?: string | null;
+  }>;
   setStarred(list: string[]): Promise<void>;
   testGiveawayMessage(text: string, privileged: boolean): Promise<TestResult | null>;
 }

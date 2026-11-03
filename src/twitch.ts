@@ -184,3 +184,80 @@ export async function fetchFollows(token: string, max = 2000): Promise<FollowedC
   }
   return out;
 }
+
+export interface ChannelReward {
+  id: string;
+  title: string;
+  cost: number;
+  prompt: string | null;
+  color: string | null;
+  image: string | null;
+  enabled: boolean;
+  paused: boolean;
+  inStock: boolean;
+  needsInput: boolean;
+}
+
+export interface ChannelRewards {
+  rewards: ChannelReward[];
+  balance: number | null;
+  pointsName: string | null;
+  pointsIcon: string | null;
+}
+
+/** Belohnungen eines Kanals und dein Kontostand dort (über deinen Login, wie auf twitch.tv). */
+export async function fetchRewards(login: string, token: string): Promise<ChannelRewards> {
+  // login ist vorher gegen [a-z0-9_] geprüft
+  const query = `query {
+    user(login: ${JSON.stringify(login)}) {
+      channel {
+        self { communityPoints { balance } }
+        communityPointsSettings {
+          name
+          image { url }
+          customRewards {
+            id title cost prompt backgroundColor
+            isEnabled isPaused isInStock isUserInputRequired
+            image { url url2x }
+            defaultImage { url url2x }
+          }
+        }
+      }
+    }
+  }`;
+  const res = await net.fetch(GQL_URL, {
+    method: 'POST',
+    headers: { 'Client-ID': WEB_CLIENT_ID, Authorization: `OAuth ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query }),
+  });
+  if (res.status === 401) throw new Error('Twitch-Login abgelaufen – bitte ab- und wieder anmelden.');
+  if (!res.ok) throw new Error(`Twitch antwortet mit HTTP ${res.status}`);
+  const json = (await res.json()) as any;
+  if (Array.isArray(json?.errors) && json.errors.length) throw new Error(String(json.errors[0]?.message ?? 'GQL-Fehler'));
+  const ch = json?.data?.user?.channel;
+  if (!ch) throw new Error('Kanal nicht gefunden.');
+  const settings = ch.communityPointsSettings;
+  const rewards: ChannelReward[] = (Array.isArray(settings?.customRewards) ? settings.customRewards : [])
+    .filter((r: any) => r && typeof r.id === 'string' && typeof r.title === 'string')
+    .map((r: any) => ({
+      id: r.id,
+      title: r.title,
+      cost: Number(r.cost) || 0,
+      prompt: r.prompt || null,
+      color: typeof r.backgroundColor === 'string' && /^#[0-9a-f]{3,8}$/i.test(r.backgroundColor) ? r.backgroundColor : null,
+      image: r.image?.url2x || r.image?.url || r.defaultImage?.url2x || r.defaultImage?.url || null,
+      enabled: r.isEnabled !== false,
+      paused: r.isPaused === true,
+      inStock: r.isInStock !== false,
+      needsInput: r.isUserInputRequired === true,
+    }))
+    .filter((r: ChannelReward) => r.enabled)
+    .sort((a: ChannelReward, b: ChannelReward) => a.cost - b.cost);
+  const bal = ch.self?.communityPoints?.balance;
+  return {
+    rewards,
+    balance: typeof bal === 'number' ? bal : null,
+    pointsName: settings?.name || null,
+    pointsIcon: settings?.image?.url || null,
+  };
+}

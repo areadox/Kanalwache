@@ -2,7 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, No
 import { RecordingFiles } from './recorder';
 import * as path from 'node:path';
 import { clampPoll, normalizeLogin, Settings, Store } from './store';
-import { ChannelStatus, fetchFollows, fetchModChannels, fetchStatuses, FollowedChannel } from './twitch';
+import { ChannelRewards, ChannelStatus, fetchFollows, fetchModChannels, fetchRewards, fetchStatuses, FollowedChannel } from './twitch';
 import { TwitchChat } from './chat';
 import { analyzeAnnouncement, ENTRY_RE, Giveaway, GiveawayDetector } from './giveaway';
 import { compileRules, CompiledRules, DEFAULT_RULES, sanitizeRules } from './rules';
@@ -676,6 +676,22 @@ function registerIpc(): void {
     store.config.ignoredFollows = store.config.ignoredFollows.filter((l) => l !== login);
     saveAndPush(true);
     return { ok: true };
+  });
+
+  const rewardsCache = new Map<string, { at: number; data: ChannelRewards }>();
+  ipcMain.handle('get-rewards', async (_e, login: unknown, force: unknown) => {
+    const l = typeof login === 'string' ? normalizeLogin(login) : null;
+    if (!l) return { ok: false, error: 'Ungültiger Kanal.' };
+    if (!authToken) return { ok: false, error: 'Dafür musst du bei Twitch angemeldet sein.' };
+    const hit = rewardsCache.get(l);
+    if (!force && hit && Date.now() - hit.at < 60_000) return { ok: true, ...hit.data };
+    try {
+      const data = await fetchRewards(l, authToken);
+      rewardsCache.set(l, { at: Date.now(), data });
+      return { ok: true, ...data };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
   });
 
   ipcMain.handle('get-follows', async (_e, force: unknown) => {
