@@ -172,7 +172,7 @@ Kanalwache erkennt automatisch, auf welchen deiner Kanäle du Moderator bist –
 
 ## Benutzung
 
-1. Unter [Releases](https://github.com/areadox/Kanalwache/releases) die neueste `Kanalwache-x.y.z-portable.exe` herunterladen und starten (keine Installation nötig).
+1. Unter [Releases](https://github.com/areadox/Kanalwache/releases) die neueste Version herunterladen: `Kanalwache-x.y.z-portable.exe` einfach starten (keine Installation nötig) oder `Kanalwache-Setup-x.y.z.exe` installieren.
 2. Oben links **Bei Twitch anmelden**.
 3. Unter *Mein Kanal* deinen Kanalnamen festlegen, darunter Lieblingskanäle hinzufügen – Name, `@Name` oder `twitch.tv/…`-Link funktionieren – oder mit **Gefolgte Kanäle übernehmen …** alle Follows auf einmal holen.
 4. Beim Auge-Symbol festlegen, bei welchen Kanälen du automatisch zuschauen willst.
@@ -185,6 +185,10 @@ Einstellungen und Login liegen unter `%APPDATA%\Kanalwache`.
 - Jeder Kanal wird von dir genau einmal mit deinem echten Account angeschaut. Kanalwache erzeugt keine zusätzlichen Zuschauer.
 - Für den Chat nutzt Kanalwache deinen Twitch-Login aus der App. Wird er dafür nicht angenommen, liest Kanalwache anonym weiter mit; Teilnehmen geht dann erst nach Ab- und wieder Anmelden.
 - „Mit Google anmelden“ blockiert Google in eingebetteten Fenstern oft. Melde dich dann mit Twitch-Benutzername und Passwort an.
+
+## Releases
+
+Releases entstehen automatisch: Der Workflow `.github/workflows/release.yml` prüft bei jedem Push auf `main`, ob die Version aus `package.json` schon als Tag existiert. Ist sie neu, baut GitHub Actions unter Windows den Installer und die portable `.exe` und veröffentlicht sie als Release `vX.Y.Z` – mit der Commit-Nachricht als Beschreibung. Für eine neue Version reicht es also, die Version in `package.json` zu erhöhen und zu pushen.
 
 ## Selbst bauen
 

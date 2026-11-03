@@ -1,0 +1,68 @@
+# Baut Kanalwache für Windows und veröffentlicht ein Release, sobald auf main
+# eine neue Version in package.json steht (z. B. 0.0.3 → Tag v0.0.3).
+# Steht die Version schon als Tag im Repo, passiert nichts.
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+      release: ${{ steps.ver.outputs.release }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: ver
+        run: |
+          v=$(node -p "require('./package.json').version")
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          if git ls-remote --exit-code --tags origin "refs/tags/v$v" > /dev/null; then
+            echo "v$v gibt es schon – kein neues Release."
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Neue Version v$v – wird gebaut und veröffentlicht."
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    needs: check
+    if: needs.check.outputs.release == 'true'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Windows-Build (Installer + portable .exe)
+        run: npm run build && npx electron-builder --win nsis portable --publish never
+
+      - name: Release veröffentlichen
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.check.outputs.version }}
+        run: |
+          # Release-Text aus der Commit-Nachricht (ohne Sitzungs-Zeile)
+          git log -1 --format=%B | grep -v '^Claude-Session:' > notes.md
+          printf '\n---\n**Download:** `Kanalwache-%s-portable.exe` starten (keine Installation nötig) oder `Kanalwache-Setup-%s.exe` installieren.\n' "$VERSION" "$VERSION" >> notes.md
+          gh release create "v$VERSION" \
+            release/Kanalwache-*.exe \
+            --target "$GITHUB_SHA" \
+            --title "Kanalwache v$VERSION" \
+            --notes-file notes.md
