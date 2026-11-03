@@ -71,7 +71,7 @@ Ein Klick auf den Kanalpunkte-Knopf **🪙 Kontostand** rechts in der zweiten Le
 - Oben Kanal und dein Kontostand, darunter alle Belohnungen des Kanals als Kacheln – mit Bild, Farbe und Preis, die günstigsten zuerst.
 - Belohnungen, die du dir gerade nicht leisten kannst oder die pausiert bzw. ausverkauft sind, sind ausgegraut.
 - Klick auf eine Belohnung → unten erscheint die Beschreibung und **„Für 500 einlösen“**. Verlangt die Belohnung einen Text, gibst du ihn dort ein.
-- Eingelöst wird über Twitchs eigenes Belohnungsmenü im Chat (dort laufen Twitchs Prüfungen) – Kanalwache klickt das für dich. Klappt das einmal nicht, öffnet Kanalwache stattdessen Twitchs Menü im Chat, und du löst dort direkt ein.
+- Eingelöst wird über Twitchs eigenes Belohnungsmenü im Chat (dort laufen Twitchs Prüfungen) – Kanalwache klickt das für dich, auch wenn der Chat ausgeblendet ist. Klappt das einmal nicht, bleibt Twitchs Menü im eingeblendeten Chat offen, und du löst dort direkt ein. Die Meldung dazu hat den Knopf **Fehlerbericht kopieren**: Er kopiert, was Twitchs Menü in dem Moment angezeigt hat – damit lässt sich die Erkennung gezielt anpassen.
 - Schließen mit **Esc**, Klick daneben oder ×. Wechselst du den Tab, zeigt das Menü die Belohnungen des neuen Kanals.
 - Ganz unten: *Twitchs Menü im Chat öffnen* – für alles, was Twitch zusätzlich anbietet (z. B. Emote freischalten, hervorgehobene Nachricht).
 

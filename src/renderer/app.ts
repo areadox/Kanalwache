@@ -1,4 +1,5 @@
 const api = window.kanalwache;
+let APP_VERSION = '';
 
 // ---------- kleine Helfer ----------
 
@@ -1634,49 +1635,123 @@ let rwBusy = false;
 let rwDone: string | null = null;
 
 /** Löst eine Belohnung über Twitchs eigenes Menü im Chat ein (dort laufen Twitchs Prüfungen). */
-const REDEEM_FN = `async (title, input) => {
+const REDEEM_FN = `async (title, input, cost) => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const norm = (s) => (s || '').replace(/\\s+/g, ' ').trim().toLowerCase();
-  const summary = document.querySelector('[data-test-selector="community-points-summary"]');
-  if (!summary) return 'no-points';
-  const isBonus = (b) => !!b.querySelector('.claimable-bonus__icon') || /bonus|claim|abholen|einfordern/i.test(b.getAttribute('aria-label') || '');
-  const main = Array.from(summary.querySelectorAll('button')).find((b) => !isBonus(b));
-  const log = document.querySelector('[data-test-selector="chat-scrollable-area__message-container"], .chat-scrollable-area__message-container');
-  const outsideChat = (el) => !(log && log.contains(el)) && !summary.contains(el);
   const want = norm(title);
-  const findReward = () => Array.from(document.querySelectorAll('button, [role="button"]'))
-    .filter((el) => outsideChat(el) && norm(el.textContent).includes(want))
-    .sort((a, b) => norm(a.textContent).length - norm(b.textContent).length)[0] || null;
+  const summary = document.querySelector('[data-test-selector="community-points-summary"]');
+  const log = document.querySelector('[data-test-selector="chat-scrollable-area__message-container"], .chat-scrollable-area__message-container, [role="log"]');
+  const ok = (el) => !!el && el.isConnected && !(log && log.contains(el)) && !(summary && summary.contains(el)) && el.getAttribute('data-a-target') !== 'chat-input';
+  // „Sichtbar“ heißt hier nur: nicht per display:none weg – der Chat kann bei Kanalwache ausgeblendet (0 px breit) sein
+  const visible = (el) => el.getClientRects().length > 0;
+
+  // Kurze Beschreibung neuer Elemente – für den Fehlerbericht
+  const describe = (roots) => {
+    const lines = [];
+    const seen = new Set();
+    for (const root of roots) {
+      if (!root.isConnected) continue;
+      for (const el of [root, ...root.querySelectorAll('*')]) {
+        if (lines.length >= 80) break;
+        const own = Array.from(el.childNodes).filter((n) => n.nodeType === 3).map((n) => n.textContent).join(' ').trim();
+        const label = el.getAttribute('aria-label') || el.getAttribute('title') || '';
+        const sel = el.getAttribute('data-test-selector') || el.getAttribute('data-a-target') || '';
+        if (!own && !label && !sel && !/^(BUTTON|TEXTAREA|INPUT)$/.test(el.tagName)) continue;
+        const cls = (typeof el.className === 'string' ? el.className : '').split(/\\s+/).filter((c) => c && !/^(sc-|Sc|Layout|Core)/.test(c) && c.length < 40).slice(0, 3).join('.');
+        const line = el.tagName.toLowerCase() + (cls ? '.' + cls : '') + (sel ? '[' + sel + ']' : '') + (el.getAttribute('role') ? '[role=' + el.getAttribute('role') + ']' : '') + (label ? ' aria="' + label.slice(0, 50) + '"' : '') + (own ? ' "' + own.slice(0, 60) + '"' : '');
+        if (!seen.has(line)) { seen.add(line); lines.push(line); }
+      }
+    }
+    return lines;
+  };
+  const watch = () => {
+    const added = new Set();
+    const mo = new MutationObserver((ms) => { for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1) added.add(n); });
+    mo.observe(document.body, { childList: true, subtree: true });
+    return { added, stop: () => mo.disconnect() };
+  };
+  const done = (status, extra) => JSON.stringify(Object.assign({ status }, extra || {}));
+
+  if (!summary) return done('no-points', { diag: ['kein [data-test-selector=community-points-summary] gefunden'] });
+  const isBonus = (b) => !!b.querySelector('.claimable-bonus__icon') || /bonus|claim|abholen|einfordern/i.test(b.getAttribute('aria-label') || '');
+  const summaryButtons = Array.from(summary.querySelectorAll('button'));
+  const main = summaryButtons.find((b) => !isBonus(b)) || null;
+  const summaryDiag = summaryButtons.map((b) => 'Kanalpunkte-Knopf aria="' + (b.getAttribute('aria-label') || '') + '" "' + norm(b.textContent).slice(0, 40) + '"');
+
+  // 1) Belohnung finden: kleinstes Element mit dem Namen (Text, title oder aria-label), dann den Knopf dazu
+  const clickableOf = (el) => {
+    const c = el.closest('button, [role="button"], [role="menuitem"], a[href], [tabindex]:not([tabindex="-1"])');
+    if (c && ok(c)) return c;
+    let p = el.parentElement;
+    for (let i = 0; i < 4 && p; i++, p = p.parentElement) {
+      const b = p.querySelector('button, [role="button"]');
+      if (b && ok(b)) return b;
+    }
+    return null;
+  };
+  const findReward = () => {
+    const hits = [];
+    for (const el of document.querySelectorAll('body *')) {
+      if (!ok(el) || !visible(el)) continue;
+      const own = norm(el.textContent);
+      const attr = norm(el.getAttribute('aria-label') || el.getAttribute('title') || '');
+      if (own === want || attr === want || attr.startsWith(want) || (own.includes(want) && own.length <= want.length + 30)) hits.push(el);
+    }
+    hits.sort((a, b) => norm(a.textContent).length - norm(b.textContent).length);
+    for (const el of hits) {
+      const c = clickableOf(el);
+      if (c) return c;
+    }
+    return null;
+  };
+
+  const w1 = watch();
   let reward = findReward();
-  if (!reward && main) {
+  if (!reward) {
+    if (!main) { w1.stop(); return done('no-points', { diag: summaryDiag }); }
     main.click();
-    for (let i = 0; i < 25 && !reward; i++) { await sleep(150); reward = findReward(); }
+    for (let i = 0; i < 60 && !reward; i++) { await sleep(150); reward = findReward(); }
   }
-  if (!reward) return 'not-found';
+  w1.stop();
+  if (!reward) return done('not-found', { diag: summaryDiag.concat(describe(w1.added)) });
+
+  // 2) Belohnung anklicken, ggf. Text eingeben, „Einlösen“ suchen
+  const w2 = watch();
   reward.click();
-  await sleep(350);
+  await sleep(400);
   if (input) {
     let ta = null;
-    for (let i = 0; i < 20 && !ta; i++) {
-      ta = Array.from(document.querySelectorAll('textarea')).find((t) => outsideChat(t) && t.getAttribute('data-a-target') !== 'chat-input') || null;
+    for (let i = 0; i < 25 && !ta; i++) {
+      ta = Array.from(document.querySelectorAll('textarea, input[type="text"]')).find((t) => ok(t) && visible(t)) || null;
       if (!ta) await sleep(150);
     }
-    if (!ta) return 'no-input';
-    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set;
-    setter.call(ta, input);
+    if (!ta) { w2.stop(); return done('no-input', { diag: describe(w2.added) }); }
+    const proto = ta.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+    Object.getOwnPropertyDescriptor(proto, 'value').set.call(ta, input);
     ta.dispatchEvent(new Event('input', { bubbles: true }));
     await sleep(250);
   }
-  let btn = null;
-  for (let i = 0; i < 25 && !btn; i++) {
-    btn = Array.from(document.querySelectorAll('button')).find((b) => outsideChat(b) && b !== reward && /einlösen|redeem/i.test(b.textContent || '') && !b.disabled) || null;
-    if (!btn) await sleep(150);
-  }
-  if (!btn) return 'no-confirm';
-  btn.click();
-  await sleep(900);
-  const err = Array.from(document.querySelectorAll('[role="alert"], [class*="error"]')).map((e) => (e.textContent || '').trim()).find((t) => t.length > 3 && t.length < 200);
-  return err ? 'error:' + err : 'ok';
+  const costTexts = [String(cost), Number(cost).toLocaleString('de-DE'), Number(cost).toLocaleString('en-US')];
+  const findConfirm = () => {
+    const btns = Array.from(document.querySelectorAll('button, [role="button"]')).filter((b) => ok(b) && visible(b) && b !== reward && !b.disabled && b.getAttribute('aria-disabled') !== 'true');
+    return btns.find((b) => /einlösen|redeem|eintauschen/i.test((b.textContent || '') + ' ' + (b.getAttribute('aria-label') || '')))
+      || btns.find((b) => Array.from(w2.added).some((n) => n.contains(b)) && costTexts.some((c) => norm(b.textContent).includes(c)))
+      || null;
+  };
+  let confirmBtn = null;
+  for (let i = 0; i < 30 && !confirmBtn; i++) { confirmBtn = findConfirm(); if (!confirmBtn) await sleep(150); }
+  w2.stop();
+  if (!confirmBtn) return done('no-confirm', { diag: describe(w2.added) });
+
+  // 3) Einlösen und auf eine Fehlermeldung achten
+  const w3 = watch();
+  confirmBtn.click();
+  await sleep(1200);
+  w3.stop();
+  const err = Array.from(w3.added).flatMap((n) => [n, ...n.querySelectorAll('[role="alert"], [class*="error"], [class*="Error"]')])
+    .filter((e) => e.getAttribute && (e.getAttribute('role') === 'alert' || /error/i.test(typeof e.className === 'string' ? e.className : '')))
+    .map((e) => (e.textContent || '').trim()).find((t) => t.length > 3 && t.length < 200);
+  return err ? done('error', { message: err }) : done('ok');
 }`;
 
 /** Farbige Kachel der Belohnung (Farbe per CSSOM, inline-style ist per CSP gesperrt) */
@@ -1863,12 +1938,18 @@ async function redeemReward(t: Tab, r: ChannelReward): Promise<void> {
   renderRewardsDrawer();
   let res = 'error';
   try {
-    res = String(await target.executeJavaScript(`(${REDEEM_FN})(${JSON.stringify(r.title)}, ${JSON.stringify(r.needsInput ? rwInput.trim() : '')})`));
-  } catch {
-    res = 'error';
+    res = String(await target.executeJavaScript(`(${REDEEM_FN})(${JSON.stringify(r.title)}, ${JSON.stringify(r.needsInput ? rwInput.trim() : '')}, ${r.cost})`));
+  } catch (err) {
+    res = JSON.stringify({ status: 'script', message: String(err) });
   }
   rwBusy = false;
-  if (res === 'ok') {
+  let out: { status: string; message?: string; diag?: string[] };
+  try {
+    out = JSON.parse(res);
+  } catch {
+    out = { status: 'script', message: res };
+  }
+  if (out.status === 'ok') {
     rwDone = `„${r.title}“ eingelöst.`;
     rwSel = null;
     rwInput = '';
@@ -1881,13 +1962,34 @@ async function redeemReward(t: Tab, r: ChannelReward): Promise<void> {
   } else {
     const why: Record<string, string> = {
       'no-points': 'Im Chat ist kein Kanalpunkte-Menü zu finden – ist der Chat fertig geladen?',
-      'not-found': 'Die Belohnung ist in Twitchs Menü nicht zu finden – vielleicht gerade nicht verfügbar.',
+      'not-found': 'Die Belohnung war in Twitchs Menü nicht zu finden.',
       'no-input': 'Das Textfeld der Belohnung ist nicht aufgetaucht.',
       'no-confirm': 'Der Einlösen-Knopf ist nicht aufgetaucht.',
+      script: 'Das Einlöse-Skript ist abgebrochen.',
     };
-    const msg = res.startsWith('error:') ? `Twitch meldet: ${res.slice(6)}` : why[res] ?? 'Einlösen ging nicht.';
-    toast(`${msg} Ich öffne Twitchs Menü im Chat.`);
-    void openRewards(t);
+    const msg = out.status === 'error' ? `Twitch meldet: ${out.message}` : why[out.status] ?? 'Einlösen ging nicht.';
+    // Twitchs Menü ist jetzt im Chat offen – Chat zeigen, damit du dort direkt einlösen kannst
+    closeRewardsDrawer();
+    if (chatHidden) {
+      chatHidden = false;
+      try { localStorage.setItem('kw.chatHidden', '0'); } catch { /* egal */ }
+      applyChatLayout();
+    }
+    (t.chat ?? t.wv).focus();
+    const report = [
+      `Kanalwache ${APP_VERSION} – Fehlerbericht Belohnung einlösen`,
+      `Kanal: ${t.login} · Belohnung: ${r.title} · Kosten: ${r.cost} · Text nötig: ${r.needsInput ? 'ja' : 'nein'}`,
+      `Ergebnis: ${out.status}${out.message ? ' – ' + out.message : ''}`,
+      '',
+      ...(out.diag ?? []),
+    ].join('\n');
+    toast(`${msg} Twitchs Menü ist im Chat offen – dort direkt einlösen.`, {
+      label: 'Fehlerbericht kopieren',
+      run: () => {
+        void api.copyText(report);
+        toast('Fehlerbericht kopiert – einfach in den Chat mit Claude einfügen.');
+      },
+    });
   }
   renderRewardsDrawer();
 }
@@ -2437,6 +2539,7 @@ async function main(): Promise<void> {
   api.onShowGiveaways(() => activate('giveaways'));
   api.onShortcut(handleShortcut);
   setupRecording();
+  void api.appVersion().then((v) => { APP_VERSION = v; });
   document.getElementById('rw-backdrop')!.addEventListener('click', () => closeRewardsDrawer());
   setupTabList();
   api.onToast(toast);

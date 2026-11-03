@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, Notification, session, shell, Tray, webContents } from 'electron';
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeImage, nativeTheme, Notification, session, shell, Tray, webContents } from 'electron';
 import { RecordingFiles } from './recorder';
 import * as path from 'node:path';
 import { clampPoll, normalizeLogin, Settings, Store } from './store';
@@ -891,6 +891,12 @@ function registerIpc(): void {
   ipcMain.handle('rec-show-file', (_e, file: unknown) => {
     if (typeof file === 'string' && file.startsWith(recordDir())) shell.showItemInFolder(file);
   });
+
+  ipcMain.handle('copy-text', (_e, text: unknown) => {
+    if (typeof text === 'string') clipboard.writeText(text.slice(0, 20000));
+  });
+
+  ipcMain.handle('app-version', () => app.getVersion());
 
   ipcMain.handle('open-external', (_e, url: unknown) => {
     if (typeof url === 'string' && /^https:\/\//i.test(url)) void shell.openExternal(url);

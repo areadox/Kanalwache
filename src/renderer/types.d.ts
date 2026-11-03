@@ -170,6 +170,8 @@ interface KanalwacheApi {
   onRecError(cb: (id: string, msg: string) => void): void;
   onStopAllRecordings(cb: () => void): void;
   onShortcut(cb: (name: string) => void): void;
+  copyText(text: string): Promise<void>;
+  appVersion(): Promise<string>;
   getRewards(login: string, force: boolean): Promise<{
     ok: boolean;
     error?: string;
