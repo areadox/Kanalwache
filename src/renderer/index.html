@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; img-src 'self' https://static-cdn.jtvnw.net data:; style-src 'self'; script-src 'self'">
+  <title>Kanalwache</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <aside id="sidebar">
+    <header class="brand">
+      <img src="../icon.png" alt="" class="brand-icon">
+      <span>Kanalwache</span>
+    </header>
+
+    <div id="auth"></div>
+
+    <section class="block">
+      <h2>Mein Kanal</h2>
+      <div id="own"></div>
+    </section>
+
+    <section class="block grow">
+      <h2>Lieblingskanäle <span id="live-count" class="count"></span></h2>
+      <input id="fav-filter" class="fav-filter" placeholder="Kanäle filtern …" spellcheck="false" autocomplete="off" hidden>
+      <div id="favorites" class="channel-list"></div>
+      <form id="add-form" autocomplete="off">
+        <input id="add-input" placeholder="Kanal hinzufügen (Name oder Link)" spellcheck="false">
+        <button type="submit" title="Hinzufügen">+</button>
+      </form>
+      <p id="add-error" class="form-error"></p>
+      <button type="button" id="btn-follows" class="link-btn follows-link">Gefolgte Kanäle übernehmen …</button>
+    </section>
+
+    <footer class="sidebar-foot">
+      <span id="last-check"></span>
+      <button id="btn-check" class="icon-btn" title="Jetzt prüfen"></button>
+      <button id="btn-settings" class="icon-btn" title="Einstellungen"></button>
+    </footer>
+  </aside>
+
+  <main>
+    <nav id="tabbar"></nav>
+    <div id="tab-list" class="tab-list" hidden>
+      <input placeholder="Tab suchen …" spellcheck="false" autocomplete="off" aria-label="Tab suchen">
+      <div id="tab-list-items" class="tl-items" role="listbox"></div>
+      <div class="tl-foot">
+        <span class="muted">↑↓ wählen · Enter öffnen · Entf schließen</span>
+        <button type="button" class="link-btn danger" id="tab-list-closeall">Alle Tabs schließen</button>
+      </div>
+    </div>
+    <div id="views">
+      <section id="view-home" class="view home active"></section>
+      <section id="view-giveaways" class="view home"></section>
+    </div>
+  </main>
+
+  <dialog id="settings">
+    <form method="dialog" class="settings">
+      <h2>Einstellungen</h2>
+      <h3>Giveaway-Helfer</h3>
+      <label class="row"><input type="checkbox" data-setting="giveawayHelper"> Chat der Live-Kanäle mitlesen und Giveaways erkennen</label>
+      <label class="row"><input type="checkbox" data-setting="giveawayNotify"> Benachrichtigen, wenn ein Giveaway startet</label>
+      <div class="row"><button type="button" class="btn small" id="btn-rules">Erkennungswörter bearbeiten …</button></div>
+      <h3>Aufnahmen</h3>
+      <p class="muted rule-hint">Nur in Kanälen verfügbar, in denen du Mod bist – über den Knopf „Aufnehmen“ oben rechts im Stream-Tab.</p>
+      <div class="row rec-dir-row"><span class="muted">Ordner:</span> <span id="rec-dir" class="rec-dir"></span>
+        <button type="button" class="btn small" id="btn-rec-dir">Ändern …</button>
+        <button type="button" class="btn small" id="btn-rec-open">Öffnen</button></div>
+      <label class="row select">Qualität
+        <select data-setting="recordQuality">
+          <option value="high">Hoch (8 Mbit/s, ca. 3,6 GB pro Stunde)</option>
+          <option value="medium">Mittel (5 Mbit/s, ca. 2,3 GB pro Stunde)</option>
+          <option value="low">Niedrig (2,5 Mbit/s, ca. 1,1 GB pro Stunde)</option>
+        </select>
+      </label>
+      <h3>Kanalpunkte</h3>
+      <label class="row"><input type="checkbox" data-setting="autoClaimPoints"> Bonus in offenen Streams automatisch abholen</label>
+      <h3>Gefolgte Kanäle</h3>
+      <label class="row"><input type="checkbox" data-setting="syncFollows"> Automatisch abgleichen: neue Follows hinzufügen, entfolgte entfernen</label>
+      <div class="row"><button type="button" class="btn small" id="btn-follows-2">Gefolgte Kanäle übernehmen …</button></div>
+      <h3>Streams &amp; Fenster</h3>
+      <label class="row"><input type="checkbox" data-setting="singleAudio"> Ton nur aus einem Tab – dem Stream, den du gerade ansiehst</label>
+      <label class="row"><input type="checkbox" data-setting="fullPage"> Ganze Twitch-Seite zeigen statt nur Stream und Chat</label>
+      <label class="row"><input type="checkbox" data-setting="muteAutoOpened"> Automatisch geöffnete Streams stumm starten</label>
+      <label class="row"><input type="checkbox" data-setting="closeTabWhenOffline"> Automatisch geöffnete Tabs schließen, wenn der Stream endet</label>
+      <label class="row"><input type="checkbox" data-setting="closeToTray"> Beim Schließen im Infobereich weiterlaufen</label>
+      <label class="row"><input type="checkbox" data-setting="startInTray"> Im Infobereich starten (Fenster versteckt)</label>
+      <label class="row"><input type="checkbox" data-setting="autostart"> Mit Windows starten</label>
+      <label class="row select">Live-Status prüfen alle
+        <select data-setting="pollSeconds">
+          <option value="30">30 Sekunden</option>
+          <option value="60">1 Minute</option>
+          <option value="120">2 Minuten</option>
+          <option value="300">5 Minuten</option>
+        </select>
+      </label>
+      <div class="settings-account" id="settings-account"></div>
+      <div class="settings-actions">
+        <button value="close" class="btn primary">Fertig</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="follows" class="wide">
+    <form method="dialog" class="settings follows">
+      <h2>Gefolgte Kanäle übernehmen</h2>
+      <p class="muted rule-hint">Wähle aus, welche Kanäle in deine Liste kommen. Kanäle, die schon drin sind, bleiben wie sie sind.</p>
+      <div class="follows-bar">
+        <input id="follows-search" placeholder="Suchen …" spellcheck="false" autocomplete="off">
+        <button type="button" class="btn small" id="follows-all">Alle</button>
+        <button type="button" class="btn small" id="follows-none">Keine</button>
+        <button type="button" class="icon-btn" id="follows-reload" title="Neu laden"></button>
+      </div>
+      <div id="follows-list" class="follows-list"></div>
+      <div class="follows-opts">
+        <label class="row"><input type="checkbox" id="follows-notify"> Benachrichtigen, wenn sie live gehen</label>
+        <label class="row"><input type="checkbox" id="follows-auto"> Automatisch zuschauen, wenn sie live gehen</label>
+        <label class="row"><input type="checkbox" id="follows-sync"> Künftig automatisch abgleichen (neue Follows hinzufügen, entfolgte entfernen)</label>
+      </div>
+      <div class="settings-actions">
+        <span id="follows-count" class="muted"></span>
+        <button value="cancel" class="btn">Abbrechen</button>
+        <button type="button" class="btn primary" id="follows-import">Übernehmen</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="rules" class="wide">
+    <form method="dialog" class="settings">
+      <h2>Erkennungswörter</h2>
+      <div id="rules-body"></div>
+      <div class="rule-test">
+        <h3>Testen</h3>
+        <div class="test-row">
+          <select id="rule-test-role">
+            <option value="privileged">Nachricht von Streamer, Mod oder Bot</option>
+            <option value="viewer">Nachricht von Zuschauer</option>
+          </select>
+          <input id="rule-test" placeholder="Chat-Nachricht einfügen, z. B. „Verlosung gestartet! Schreibt !join“" spellcheck="false" autocomplete="off">
+        </div>
+        <p id="rule-test-out" class="test-out"></p>
+      </div>
+      <div class="settings-actions">
+        <button value="close" class="btn primary">Fertig</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" role="status"></div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,47 @@
+{
+  "name": "kanalwache",
+  "productName": "Kanalwache",
+  "version": "0.0.1",
+  "description": "Eigener Twitch-Viewer: dein Kanal und deine Lieblingskanäle an einem Ort, mit automatischem Zuschauen, sobald jemand live geht.",
+  "author": "areadox",
+  "license": "MIT",
+  "repository": "github:areadox/Kanalwache",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && tsc -p tsconfig.renderer.json && node scripts/copy-static.js",
+    "start": "npm run build && electron .",
+    "dist:win": "npm run build && electron-builder --win nsis portable"
+  },
+  "build": {
+    "appId": "de.areadox.kanalwache",
+    "productName": "Kanalwache",
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "Kanalwache-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "Kanalwache-${version}-portable.${ext}"
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "electron": "^45.2.1",
+    "electron-builder": "^26.0.0",
+    "typescript": "^5.6.0"
+  }
+}
