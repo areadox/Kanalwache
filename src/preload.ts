@@ -33,6 +33,8 @@ contextBridge.exposeInMainWorld('kanalwache', {
   onStopAllRecordings: (cb: () => void) => ipcRenderer.on('stop-all-recordings', () => cb()),
   setStarred: (list: string[]) => ipcRenderer.invoke('set-starred', list),
   appVersion: () => ipcRenderer.invoke('app-version'),
+  raidNotify: (source: string, target: string) => ipcRenderer.invoke('raid-notify', source, target),
+  onRaid: (cb: (r: unknown) => void) => ipcRenderer.on('raid', (_e, r) => cb(r)),
   copyText: (text: string) => ipcRenderer.invoke('copy-text', text),
   getRewards: (login: string, force: boolean) => ipcRenderer.invoke('get-rewards', login, force),
   onShortcut: (cb: (name: string) => void) => ipcRenderer.on('shortcut', (_e, n) => cb(n)),

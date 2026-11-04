@@ -33,6 +33,8 @@ export interface Settings {
   singleAudio: boolean;
   /** Favoritenleiste unter den Tabs anzeigen */
   showFavBar: boolean;
+  /** Bei Raids nachfragen: Mitraiden oder nicht */
+  raidPrompt: boolean;
   /** Aufnahmen: Zielordner (leer = Videos\\Kanalwache) und Qualität */
   recordDir: string;
   recordQuality: 'high' | 'medium' | 'low';
@@ -68,6 +70,7 @@ export const DEFAULT_SETTINGS: Settings = {
   fullPage: false,
   singleAudio: true,
   showFavBar: true,
+  raidPrompt: true,
   recordDir: '',
   recordQuality: 'high',
   followNotify: true,

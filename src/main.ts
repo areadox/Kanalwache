@@ -1,5 +1,6 @@
 import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeImage, nativeTheme, Notification, session, shell, Tray, webContents } from 'electron';
 import { RecordingFiles } from './recorder';
+import { extractRaidTarget } from './raid';
 import * as path from 'node:path';
 import { clampPoll, normalizeLogin, Settings, Store } from './store';
 import { ChannelRewards, ChannelStatus, fetchFollows, fetchModChannels, fetchRewards, fetchStatuses, FollowedChannel } from './twitch';
@@ -91,6 +92,9 @@ function starredList(): string[] {
   return store.config.starred.filter((l) => have.has(l));
 }
 
+/** Angekündigte Raids je Kanal (aus dem Chat) */
+const pendingRaids = new Map<string, { target: string; at: number; text: string; by: string }>();
+
 // ---------- Moderation ----------
 
 /** Mod-Status laut Twitch-Abfrage (null = Abfrage hat nicht geklappt) */
@@ -138,7 +142,14 @@ async function refreshMods(): Promise<void> {
 const pendingJoins = new Map<string, { id: string; timer: NodeJS.Timeout }>();
 
 const chat = new TwitchChat({
-  onMessage: (m) => detector.handle(m),
+  onMessage: (m) => {
+    detector.handle(m);
+    // Raid-Ansage („wir raiden jetzt @xyz“) merken – geht der Kanal danach offline, kommt die Raid-Karte
+    if (m.isBroadcaster || m.isMod || rules().bots.has(m.login)) {
+      const target = extractRaidTarget(m.text, m.channel);
+      if (target) pendingRaids.set(m.channel, { target, at: Date.now(), text: m.text, by: m.displayName });
+    }
+  },
   onUserState: (channel, isMod) => {
     finishJoin(channel, null);
     if (!chat.canSend) return;
@@ -582,7 +593,15 @@ async function poll(): Promise<void> {
       if (!now) continue;
       next.set(login, now);
       if (now.live && !prev?.live) onWentLive(now, firstPoll);
-      if (!now.live && prev?.live) win?.webContents.send('channel-offline', login);
+      if (!now.live && prev?.live) {
+        win?.webContents.send('channel-offline', login);
+        // Kurz vorher einen Raid angekündigt? → „vermutlich“-Raid-Karte
+        const pending = pendingRaids.get(login);
+        if (pending && Date.now() - pending.at < 20 * 60_000 && store.config.settings.raidPrompt) {
+          win?.webContents.send('raid', { source: login, target: pending.target, guessed: true, text: `${pending.by}: ${pending.text}` });
+        }
+        pendingRaids.delete(login);
+      }
     }
     statuses = next;
     lastError = null;
@@ -783,7 +802,7 @@ function registerIpc(): void {
     if (!patch || typeof patch !== 'object') return;
     const p = patch as Partial<Settings>;
     const s = store.config.settings;
-    for (const key of ['closeToTray', 'startInTray', 'autostart', 'muteAutoOpened', 'closeTabWhenOffline', 'giveawayHelper', 'giveawayNotify', 'autoClaimPoints', 'syncFollows', 'followNotify', 'followAutoOpen', 'fullPage', 'singleAudio', 'showFavBar'] as const) {
+    for (const key of ['closeToTray', 'startInTray', 'autostart', 'muteAutoOpened', 'closeTabWhenOffline', 'giveawayHelper', 'giveawayNotify', 'autoClaimPoints', 'syncFollows', 'followNotify', 'followAutoOpen', 'fullPage', 'singleAudio', 'showFavBar', 'raidPrompt'] as const) {
       if (typeof p[key] === 'boolean') s[key] = p[key] as boolean;
     }
     if (typeof p.pollSeconds === 'number') s.pollSeconds = clampPoll(p.pollSeconds);
@@ -890,6 +909,20 @@ function registerIpc(): void {
 
   ipcMain.handle('rec-show-file', (_e, file: unknown) => {
     if (typeof file === 'string' && file.startsWith(recordDir())) shell.showItemInFolder(file);
+  });
+
+  ipcMain.handle('raid-notify', (_e, source: unknown, target: unknown) => {
+    if (typeof source !== 'string' || typeof target !== 'string' || !Notification.isSupported()) return;
+    if (win?.isVisible() && win.isFocused()) return;
+    const from = statuses.get(source)?.displayName ?? source;
+    const n = new Notification({
+      title: `⚔ ${from} raidet ${target}`,
+      body: 'Klicken, um mitzuraiden oder abzulehnen.',
+      icon: iconPath(),
+      timeoutType: 'never',
+    });
+    n.on('click', () => showWindow());
+    n.show();
   });
 
   ipcMain.handle('copy-text', (_e, text: unknown) => {

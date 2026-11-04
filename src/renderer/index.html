@@ -86,6 +86,8 @@
       <h3>Gefolgte Kanäle</h3>
       <label class="row"><input type="checkbox" data-setting="syncFollows"> Automatisch abgleichen: neue Follows hinzufügen, entfolgte entfernen</label>
       <div class="row"><button type="button" class="btn small" id="btn-follows-2">Gefolgte Kanäle übernehmen …</button></div>
+      <h3>Raids</h3>
+      <label class="row"><input type="checkbox" data-setting="raidPrompt"> Bei Raids nachfragen, ob du mitraiden willst</label>
       <h3>Streams &amp; Fenster</h3>
       <label class="row"><input type="checkbox" data-setting="showFavBar"> Favoritenleiste unter den Tabs anzeigen</label>
       <label class="row"><input type="checkbox" data-setting="singleAudio"> Ton nur aus einem Tab – dem Stream, den du gerade ansiehst</label>
@@ -155,6 +157,7 @@
     </form>
   </dialog>
 
+  <div id="raid-stack" class="raid-stack" aria-live="polite"></div>
   <div id="toast" role="status"></div>
 
   <script type="module" src="app.js"></script>

@@ -33,6 +33,7 @@ interface AppSettings {
   fullPage: boolean;
   singleAudio: boolean;
   showFavBar: boolean;
+  raidPrompt: boolean;
   recordDir: string;
   recordQuality: 'high' | 'medium' | 'low';
   followNotify: boolean;
@@ -171,6 +172,8 @@ interface KanalwacheApi {
   onStopAllRecordings(cb: () => void): void;
   onShortcut(cb: (name: string) => void): void;
   copyText(text: string): Promise<void>;
+  raidNotify(source: string, target: string): Promise<void>;
+  onRaid(cb: (r: { source: string; target: string; guessed: boolean; text: string }) => void): void;
   appVersion(): Promise<string>;
   getRewards(login: string, force: boolean): Promise<{
     ok: boolean;

@@ -815,3 +815,37 @@ main { position: relative; }
 .rw-go .ico { width: 15px; height: 15px; }
 .rw-foot { padding: 8px 16px 12px; border-top: 1px solid var(--line); }
 .pts-btn.on { background: rgba(180, 140, 255, .28); border-color: var(--accent); }
+
+/* ---------- Raid-Karten ---------- */
+.raid-stack {
+  position: fixed; right: 18px; bottom: 18px; z-index: 120;
+  display: flex; flex-direction: column; gap: 10px; width: min(360px, calc(100vw - 36px));
+}
+.raid-card {
+  position: relative; overflow: hidden; padding: 12px 14px 14px;
+  background: #1d1a26; border: 1px solid rgba(180, 140, 255, .55); border-radius: 12px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .55); animation: raid-in .25s ease;
+}
+.raid-card.guessed { border-color: rgba(255, 193, 69, .5); }
+.raid-card.leaving { animation: raid-out .22s ease forwards; }
+@keyframes raid-in { from { transform: translateY(14px); opacity: 0; } }
+@keyframes raid-out { to { transform: translateX(30px); opacity: 0; } }
+.raid-head { display: flex; align-items: center; gap: 7px; margin-bottom: 8px; }
+.raid-head > .ico { width: 16px; height: 16px; color: var(--accent); }
+.raid-card.guessed .raid-head > .ico { color: var(--gift); }
+.raid-kicker { flex: 1; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; color: #d9ccff; }
+.raid-card.guessed .raid-kicker { color: #ffd98a; }
+.raid-x { width: 24px; height: 24px; }
+.raid-main { display: flex; align-items: center; gap: 10px; }
+.raid-line { margin: 0; font-size: 14.5px; line-height: 1.35; }
+.raid-target { color: #d9ccff; }
+.raid-text {
+  margin: 8px 0 0; padding: 6px 9px; border-radius: 7px; background: rgba(0, 0, 0, .25);
+  color: #cfcfd8; font-size: 12px; line-height: 1.4; overflow-wrap: anywhere;
+}
+.raid-hint { margin: 6px 0 0; color: var(--muted); font-size: 11.5px; }
+.raid-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.raid-go { display: inline-flex; align-items: center; gap: 6px; }
+.raid-go .ico { width: 15px; height: 15px; }
+.raid-bar { position: absolute; left: 0; bottom: 0; height: 3px; width: 100%; background: var(--accent); transition: width .25s linear; }
+.raid-card.guessed .raid-bar { background: var(--gift); }

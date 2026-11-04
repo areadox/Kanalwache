@@ -48,6 +48,7 @@ const ICONS = {
   list: '<svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>',
   record: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5" fill="currentColor"/></svg>',
   star: '<svg viewBox="0 0 24 24"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9L12 3.5Z"/></svg>',
+  sword: '<svg viewBox="0 0 24 24"><path d="M14.5 17.5 3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2"/></svg>',
   home: '<svg viewBox="0 0 24 24"><path d="M4 11 12 4l8 7v9h-5v-6H9v6H4v-9Z"/></svg>',
 };
 
@@ -1022,6 +1023,180 @@ function renderFavBar(): void {
   scroller.scrollLeft = favScroll;
   updateSub();
   bar.querySelector('.fav-chip.active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+// ---------- Raids ----------
+
+interface RaidInfo {
+  source: string;
+  target: string;
+  /** Nur aus einer Chat-Ansage geschlossen, nicht aus Twitchs Raid-Banner */
+  guessed: boolean;
+  text: string;
+  /** Twitchs Banner hat einen „Beitreten“- bzw. „Verlassen“-Knopf */
+  join: boolean;
+  leave: boolean;
+}
+
+const RAID_SHOW_MS = 3 * 60_000;
+/** Schon gezeigte Raids (Quelle>Ziel) – nicht doppelt melden */
+const raidSeen = new Map<string, number>();
+let raidScan = false;
+
+/** Sucht in Twitchs Chat das Raid-Banner („X raidet Y …“) und liest Ziel und Knöpfe aus. */
+const RAID_JS = `(() => {
+  const norm = (s) => (s || '').replace(/\\s+/g, ' ').trim();
+  const log = document.querySelector('[data-test-selector="chat-scrollable-area__message-container"], .chat-scrollable-area__message-container, [role="log"]');
+  const word = /\\braid(?:et|en|est|ing|s)?\\b/i;
+  const incoming = /\\b(raided|geraidet|danke|thanks|willkommen|welcome|from|von)\\b/i;
+  const hits = [];
+  for (const el of document.querySelectorAll('div, section, aside, p')) {
+    if (log && log.contains(el)) continue;
+    const t = norm(el.textContent);
+    if (t.length < 6 || t.length > 240 || !word.test(t) || incoming.test(t)) continue;
+    if (!el.getClientRects().length) continue;
+    hits.push(el);
+  }
+  if (!hits.length) return null;
+  hits.sort((a, b) => norm(b.textContent).length - norm(a.textContent).length);
+  for (const box of hits) {
+    const text = norm(box.textContent);
+    const btns = Array.from(box.querySelectorAll('button, [role="button"]'));
+    const label = (b) => (b.textContent || '') + ' ' + (b.getAttribute('aria-label') || '');
+    const join = btns.some((b) => /beitreten|join|mitmachen|teilnehmen|jetzt raiden|raid now/i.test(label(b)));
+    const leave = btns.some((b) => /verlassen|leave|abbrechen|cancel|nicht/i.test(label(b)));
+    const countdown = /\\b\\d{1,2}:\\d{2}\\b|\\b\\d{1,3}\\s*(?:s|sek|sec)/i.test(text);
+    let target = null;
+    for (const a of box.querySelectorAll('a[href]')) {
+      const href = a.getAttribute('href') || '';
+      const m = href.match(/^\\/([A-Za-z0-9_]{3,25})(?:[/?#]|$)/) || href.match(/twitch\\.tv\\/([A-Za-z0-9_]{3,25})(?:[/?#]|$)/);
+      if (m && !/^(popout|moderator|directory|settings|videos|search|subs|wallet|drops)$/i.test(m[1])) {
+        const shown = norm(a.textContent);
+        target = shown.toLowerCase() === m[1].toLowerCase() ? shown : m[1];
+        break;
+      }
+    }
+    if (!target) {
+      const m = text.match(/(?:raidet|raiding|raids|raiden)\\s+(?:jetzt\\s+)?(?:zu\\s+|to\\s+|bei\\s+)?@?([A-Za-z0-9_]{3,25})/i) || text.match(/raid\\s+(?:zu|to|auf|bei)\\s+@?([A-Za-z0-9_]{3,25})/i);
+      if (m) target = m[1];
+    }
+    // Nur echte Banner: Ziel gefunden und Knopf oder Countdown dabei (sonst z. B. „Raid-Abend“ im Titel)
+    if (target && (join || leave || countdown)) {
+      // Für die Karte: Banner-Text ohne die Knopf-Beschriftungen
+      const copy = box.cloneNode(true);
+      copy.querySelectorAll('button, [role="button"]').forEach((b) => b.remove());
+      return { target, text: norm(copy.textContent).slice(0, 200), join, leave };
+    }
+  }
+  return null;
+})()`;
+
+/** Klickt im Raid-Banner „Beitreten“ bzw. „Verlassen“. */
+function raidClickJs(kind: 'join' | 'leave'): string {
+  const re = kind === 'join' ? '/beitreten|join|mitmachen|teilnehmen|jetzt raiden|raid now/i' : '/verlassen|leave|abbrechen|cancel/i';
+  return `(() => {
+    const log = document.querySelector('[data-test-selector="chat-scrollable-area__message-container"], .chat-scrollable-area__message-container, [role="log"]');
+    const b = Array.from(document.querySelectorAll('button, [role="button"]')).find((x) => !(log && log.contains(x)) && ${re}.test((x.textContent || '') + ' ' + (x.getAttribute('aria-label') || '')));
+    if (b) { b.click(); return true; }
+    return false;
+  })()`;
+}
+
+async function watchRaids(): Promise<void> {
+  if (raidScan || !state?.settings.raidPrompt) return;
+  raidScan = true;
+  try {
+    for (const t of tabs.values()) {
+      if (t.kind !== 'stream' || !t.login || t.mode !== 'viewer') continue;
+      const target = t.chat ?? t.wv;
+      if (!(t.chat ? t.chatReady : t.ready)) continue;
+      try {
+        const r = (await target.executeJavaScript(RAID_JS)) as { target: string; text: string; join: boolean; leave: boolean } | null;
+        if (r && r.target.toLowerCase() !== t.login) showRaid({ source: t.login, target: r.target, guessed: false, text: r.text, join: r.join, leave: r.leave });
+      } catch {
+        // Seite lädt gerade
+      }
+    }
+  } finally {
+    raidScan = false;
+  }
+}
+
+function showRaid(r: RaidInfo): void {
+  if (!state?.settings.raidPrompt) return;
+  const key = `${r.source}>${r.target.toLowerCase()}`;
+  const seen = raidSeen.get(key);
+  if (seen && Date.now() - seen < 30 * 60_000) {
+    // Schon gezeigt – nur Knöpfe aus dem Banner nachtragen, falls die Karte noch steht
+    const card = document.querySelector<HTMLElement>(`.raid-card[data-key="${CSS.escape(key)}"]`);
+    if (card && !r.guessed) card.dataset.banner = '1';
+    return;
+  }
+  raidSeen.set(key, Date.now());
+  const fromName = nameOf(r.source);
+  const ch = channelByLogin(r.source);
+  const stack = document.getElementById('raid-stack')!;
+
+  let timer = 0;
+  let left = RAID_SHOW_MS;
+  let last = Date.now();
+  const bar = h('span', { class: 'raid-bar' });
+  const close = () => {
+    clearInterval(timer);
+    card.classList.add('leaving');
+    setTimeout(() => card.remove(), 220);
+  };
+  const joinRaid = () => {
+    close();
+    const src = tabs.get(`stream:${r.source}`);
+    // Twitch Bescheid geben (Banner-Knopf), dann zum Ziel wechseln und die Quelle schließen
+    if (src && (src.chat ? src.chatReady : src.ready) && (card.dataset.banner === '1' || r.join)) {
+      void (src.chat ?? src.wv).executeJavaScript(raidClickJs('join')).catch(() => {});
+    }
+    openStream(r.target.toLowerCase(), { auto: false, muted: false, focus: true });
+    if (src) setTimeout(() => closeTab(src.id), 1500);
+    toast(`Du raidest mit zu ${r.target}.`);
+  };
+  const declineRaid = () => {
+    close();
+    const src = tabs.get(`stream:${r.source}`);
+    if (src && (src.chat ? src.chatReady : src.ready) && (card.dataset.banner === '1' || r.leave)) {
+      void (src.chat ?? src.wv).executeJavaScript(raidClickJs('leave')).catch(() => {});
+    }
+  };
+
+  const card: HTMLElement = h('article', { class: `raid-card${r.guessed ? ' guessed' : ''}`, 'data-key': key, role: 'alertdialog', 'aria-label': `${fromName} raidet ${r.target}` },
+    h('header', { class: 'raid-head' },
+      icon('sword'),
+      h('span', { class: 'raid-kicker', text: r.guessed ? 'Raid (vermutlich)' : 'Raid' }),
+      iconButton('close', 'Ausblenden', () => close(), 'raid-x')),
+    h('div', { class: 'raid-main' },
+      ch ? avatar(ch) : h('span', { class: 'avatar md placeholder', text: r.source[0].toUpperCase() }),
+      h('p', { class: 'raid-line' },
+        h('strong', { text: fromName }), ' raidet ', h('strong', { class: 'raid-target', text: channelByLogin(r.target.toLowerCase()) ? nameOf(r.target.toLowerCase()) : r.target }))),
+    r.text ? h('p', { class: 'raid-text', text: r.text }) : null,
+    r.guessed ? h('p', { class: 'raid-hint', text: 'Aus der Ansage im Chat geschlossen – der Stream ist gerade zu Ende gegangen.' }) : null,
+    h('div', { class: 'raid-actions' },
+      h('button', { type: 'button', class: 'btn', text: 'Nicht mitraiden', onclick: declineRaid }),
+      h('button', { type: 'button', class: 'btn primary raid-go', onclick: joinRaid }, icon('sword'), h('span', { text: 'Mitraiden' }))),
+    bar,
+  );
+  if (!r.guessed) card.dataset.banner = '1';
+
+  // 3 Minuten stehen lassen; beim Drüberfahren anhalten
+  let paused = false;
+  card.addEventListener('mouseenter', () => { paused = true; });
+  card.addEventListener('mouseleave', () => { paused = false; last = Date.now(); });
+  timer = window.setInterval(() => {
+    const now = Date.now();
+    if (!paused) left -= now - last;
+    last = now;
+    bar.style.width = `${Math.max(0, (left / RAID_SHOW_MS) * 100)}%`;
+    if (left <= 0) close();
+  }, 250);
+
+  stack.append(card);
+  void api.raidNotify(r.source, r.target);
 }
 
 // ---------- Tastenkürzel ----------
@@ -2538,6 +2713,8 @@ async function main(): Promise<void> {
   api.onState(applyState);
   api.onShowGiveaways(() => activate('giveaways'));
   api.onShortcut(handleShortcut);
+  api.onRaid((r) => showRaid({ source: r.source, target: r.target, guessed: r.guessed, text: r.text, join: false, leave: false }));
+  setInterval(() => void watchRaids(), 2500);
   setupRecording();
   void api.appVersion().then((v) => { APP_VERSION = v; });
   document.getElementById('rw-backdrop')!.addEventListener('click', () => closeRewardsDrawer());

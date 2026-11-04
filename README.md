@@ -19,6 +19,7 @@ Ein eigener Twitch-Viewer für Windows: dein Kanal und deine Lieblingskanäle an
 - **Favoriten** ★ in einer eigenen Leiste unter den Tabs, mit Alt+1–9 und Alt+←/→ schnell durchschalten (siehe unten)
 - **Gefolgte Kanäle übernehmen**: alle Kanäle, denen du folgst, mit einem Klick in die Liste – auf Wunsch laufend abgeglichen (siehe unten)
 - **Aufnahme**: Streams als Video aufnehmen – nur in Kanälen, in denen du Mod bist (siehe unten)
+- **Raids**: Raidet ein Kanal am Streamende, fragt Kanalwache mit einer Karte nach: mitraiden oder nicht (siehe unten)
 - **Moderation**: erkennt, wo du Mod bist, und öffnet dort mit einem Klick Twitchs Mod-Ansicht – für deinen eigenen Kanal den Stream-Manager (siehe unten)
 
 ## Giveaway-Helfer
@@ -164,6 +165,22 @@ Nach der Anmeldung holt **Gefolgte Kanäle übernehmen …** (unter der Kanallis
 - Kanäle, die du beim Übernehmen abwählst oder später entfernst, merkt sich der Abgleich und fügt sie nicht wieder hinzu. Fügst du so einen Kanal von Hand hinzu, ist er wieder normal dabei.
 - Bei vielen Kanälen erscheint über der Liste ein **Filterfeld**, und die Offline-Kanäle lassen sich mit **Offline · N** einklappen. In der Übersicht werden zuerst 30 Offline-Kanäle gezeigt.
 
+## Raids
+
+Raidet einer deiner Kanäle am Streamende einen anderen, blendet Kanalwache unten rechts eine **Raid-Karte** ein – „PixelPaula raidet KanalEins“ – mit zwei Knöpfen:
+
+- **Mitraiden**: Kanalwache sagt Twitch Bescheid (Knopf im Raid-Banner), öffnet den Zielkanal als neuen Tab, holt den Ton dorthin und schließt den alten Tab.
+- **Nicht mitraiden**: Karte schließen; gibt es im Raid-Banner einen „Verlassen“-Knopf, wird er gedrückt.
+
+Die Karte bleibt **3 Minuten** stehen (beim Drüberfahren hält der Balken an) – ist das Fenster gerade nicht im Vordergrund, kommt zusätzlich eine Windows-Benachrichtigung.
+
+Erkannt wird ein Raid auf zwei Wegen:
+
+1. **Raid-Banner im Chat** eines offenen Streams: Twitch zeigt beim Raid ein Banner mit Zielkanal und Countdown – Kanalwache schaut alle 2,5 Sekunden danach.
+2. **Ansage im Chat**: Schreiben Streamer, Mod oder Bot etwa „Wir raiden jetzt @kanal“ und geht der Kanal danach offline, erscheint die Karte als *Raid (vermutlich)*. Das funktioniert auch für Lieblingskanäle ohne offenen Tab, solange der Giveaway-Helfer den Chat mitliest. Danksagungen für eingehende Raids („Danke für den Raid!“) werden ignoriert.
+
+Abschalten lässt sich das in den Einstellungen unter *Raids*.
+
 ## Moderation
 
 Kanalwache erkennt automatisch, auf welchen deiner Kanäle du Moderator bist – über deinen Twitch-Login und zusätzlich über den Chat, sobald der Kanal live ist.
@@ -223,6 +240,7 @@ Aufbau:
 | `src/twitch.ts` | Live-Status, Mod-Status, gefolgte Kanäle und Kanalpunkte-Belohnungen abfragen |
 | `src/chat.ts` | Twitch-Chat (IRC über WebSocket): mitlesen, schreiben, Rückmeldungen |
 | `src/giveaway.ts` | Giveaway-Erkennung (Start, Teilnehmer, Ende, Gewinner) |
+| `src/raid.ts` | Raid-Ansagen im Chat erkennen |
 | `src/rules.ts` | Erkennungswörter: Standardlisten, Prüfung, Umwandlung in Suchmuster |
 | `src/recorder.ts` | Aufnahmen stückweise auf die Platte schreiben |
 | `src/store.ts` | Einstellungen und Kanalliste (JSON) |
