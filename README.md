@@ -194,6 +194,17 @@ Einstellungen und Login liegen unter `%APPDATA%\Kanalwache`.
 
 Releases entstehen automatisch: Der Workflow `.github/workflows/release.yml` prüft bei jedem Push auf `main`, ob die Version aus `package.json` schon als Tag existiert. Ist sie neu, baut GitHub Actions unter Windows den Installer und die portable `.exe` und veröffentlicht sie als Release `vX.Y.Z` – mit der Commit-Nachricht als Beschreibung. Für eine neue Version reicht es also, die Version in `package.json` zu erhöhen und zu pushen.
 
+### Release-Meldung an Discord
+
+Nach jedem neuen Release postet der Workflow eine Meldung in einen Discord-Kanal: Version, Änderungen (aus der Commit-Nachricht) und direkte Download-Links für die portable `.exe` und den Installer.
+
+Einrichten (einmalig):
+
+1. In Discord: **Servereinstellungen → Integrationen → Webhooks → Neuer Webhook**, Kanal wählen, **Webhook-URL kopieren**.
+2. Auf GitHub im Repo: **Settings → Secrets and variables → Actions → New repository secret**, Name `DISCORD_WEBHOOK_URL`, als Wert die kopierte URL.
+
+Ohne dieses Secret wird einfach keine Meldung gesendet. Zum Ausprobieren oder um eine Meldung erneut zu schicken: **Actions → Release → Run workflow**, Haken bei *Nur die Discord-Meldung für die aktuelle Version (erneut) senden*.
+
 ## Selbst bauen
 
 Voraussetzung: Node.js 20 oder neuer.

@@ -1,12 +1,18 @@
 # Baut Kanalwache für Windows und veröffentlicht ein Release, sobald auf main
 # eine neue Version in package.json steht (z. B. 0.0.3 → Tag v0.0.3).
 # Steht die Version schon als Tag im Repo, passiert nichts.
+# Danach geht eine Meldung an Discord, wenn das Secret DISCORD_WEBHOOK_URL gesetzt ist.
 name: Release
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      announce_only:
+        description: 'Nur die Discord-Meldung für die aktuelle Version (erneut) senden – nichts bauen'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -24,10 +30,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - id: ver
+        env:
+          ANNOUNCE_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.announce_only }}
         run: |
           v=$(node -p "require('./package.json').version")
           echo "version=$v" >> "$GITHUB_OUTPUT"
-          if git ls-remote --exit-code --tags origin "refs/tags/v$v" > /dev/null; then
+          if [ "$ANNOUNCE_ONLY" = "true" ]; then
+            echo "Nur Discord-Meldung für v$v."
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          elif git ls-remote --exit-code --tags origin "refs/tags/v$v" > /dev/null; then
             echo "v$v gibt es schon – kein neues Release."
             echo "release=false" >> "$GITHUB_OUTPUT"
           else
@@ -66,3 +77,58 @@ jobs:
             --target "$GITHUB_SHA" \
             --title "Kanalwache v$VERSION" \
             --notes-file notes.md
+
+  discord:
+    needs: [check, build]
+    # Nach einem neuen Release – oder von Hand über „Run workflow“ mit „Nur die Discord-Meldung …“
+    if: >-
+      always() &&
+      (needs.build.result == 'success' ||
+       (github.event_name == 'workflow_dispatch' && inputs.announce_only))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Meldung an Discord
+        env:
+          WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.check.outputs.version }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ -z "$WEBHOOK" ]; then
+            echo "::notice::Kein Secret DISCORD_WEBHOOK_URL gesetzt – keine Discord-Meldung."
+            exit 0
+          fi
+          tag="v$VERSION"
+          gh release view "$tag" --repo "$REPO" --json url,body,assets > rel.json
+          url=$(jq -r .url rel.json)
+          # Änderungen: Release-Text ohne die Download-Zeile, für Discord gekürzt
+          body=$(jq -r .body rel.json | sed '/^---$/,$d' | sed '1s/^v[0-9.]*: *//; 1s/^/**/; 1s/$/**/' | sed '/^$/N;/^\n$/D' | head -c 3500)
+          portable=$(jq -r '.assets[] | select(.name | test("portable")) | .url' rel.json | head -1)
+          setup=$(jq -r '.assets[] | select(.name | test("Setup")) | .url' rel.json | head -1)
+          downloads=""
+          [ -n "$portable" ] && downloads="[Portable .exe]($portable) – einfach starten"
+          [ -n "$setup" ] && downloads="$downloads"$'\n'"[Installer]($setup) – mit Startmenü-Eintrag"
+          jq -n \
+            --arg title "Kanalwache $tag ist da" \
+            --arg url "$url" \
+            --arg desc "$body" \
+            --arg dl "$downloads" \
+            --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{
+              username: "Kanalwache",
+              embeds: [{
+                title: $title,
+                url: $url,
+                description: $desc,
+                color: 11832575,
+                fields: (if $dl == "" then [] else [{ name: "Download", value: $dl }] end),
+                footer: { text: "Kanalwache · GitHub Release" },
+                timestamp: $ts
+              }]
+            }' > payload.json
+          code=$(curl -sS -o resp.txt -w '%{http_code}' -H 'Content-Type: application/json' -d @payload.json "$WEBHOOK")
+          if [ "$code" != "204" ] && [ "$code" != "200" ]; then
+            echo "::error::Discord hat mit HTTP $code geantwortet: $(cat resp.txt)"
+            exit 1
+          fi
+          echo "Meldung für $tag an Discord gesendet."
