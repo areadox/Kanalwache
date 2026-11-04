@@ -1036,6 +1036,10 @@ interface RaidInfo {
   /** Twitchs Banner hat einen „Beitreten“- bzw. „Verlassen“-Knopf */
   join: boolean;
   leave: boolean;
+  /** Aus Twitchs Abschluss-Zeile im Chat („… hat … geraidet“) – der Raid ist schon durch */
+  done?: boolean;
+  /** Anzeigename des Ziels, falls er vom Login abweicht */
+  name?: string;
 }
 
 const RAID_SHOW_MS = 3 * 60_000;
@@ -1067,12 +1071,13 @@ const RAID_JS = `(() => {
     const leave = btns.some((b) => /verlassen|leave|abbrechen|cancel|nicht/i.test(label(b)));
     const countdown = /\\b\\d{1,2}:\\d{2}\\b|\\b\\d{1,3}\\s*(?:s|sek|sec)/i.test(text);
     let target = null;
+    let shownName = null;
     for (const a of box.querySelectorAll('a[href]')) {
       const href = a.getAttribute('href') || '';
       const m = href.match(/^\\/([A-Za-z0-9_]{3,25})(?:[/?#]|$)/) || href.match(/twitch\\.tv\\/([A-Za-z0-9_]{3,25})(?:[/?#]|$)/);
       if (m && !/^(popout|moderator|directory|settings|videos|search|subs|wallet|drops)$/i.test(m[1])) {
-        const shown = norm(a.textContent);
-        target = shown.toLowerCase() === m[1].toLowerCase() ? shown : m[1];
+        target = m[1];
+        shownName = norm(a.textContent) || m[1];
         break;
       }
     }
@@ -1085,11 +1090,54 @@ const RAID_JS = `(() => {
       // Für die Karte: Banner-Text ohne die Knopf-Beschriftungen
       const copy = box.cloneNode(true);
       copy.querySelectorAll('button, [role="button"]').forEach((b) => b.remove());
-      return { target, text: norm(copy.textContent).slice(0, 200), join, leave };
+      return { target, name: shownName || target, text: norm(copy.textContent).slice(0, 200), join, leave };
     }
   }
   return null;
 })()`;
+
+/**
+ * Läuft im Twitch-Chat: sucht Twitchs Abschluss-Zeile eines Raids im Chatverlauf –
+ * nur Systemzeilen ohne Absender, damit Zuschauer-Nachrichten wie „Raid zu X lol“ nichts auslösen.
+ * Wird per toString() in die Seite geschickt, darf also nichts von außen benutzen.
+ */
+function raidDoneScan(source: string, display: string): { target: string; name: string; text: string } | null {
+  const norm = (x: string | null) => (x || '').replace(/\s+/g, ' ').trim();
+  const log = document.querySelector('[data-test-selector="chat-scrollable-area__message-container"], .chat-scrollable-area__message-container, [role="log"]');
+  if (!log) return null;
+  const userSel = '[data-a-target="chat-message-username"], .chat-author__display-name, .chat-line__username, [data-a-user]';
+  const msgSel = '.chat-line__message, [data-a-target="chat-line-message"]';
+  const NAME = '@?([A-Za-z0-9_]{3,25})';
+  const isSrc = (n: string) => n.toLowerCase() === source.toLowerCase() || n.toLowerCase() === display.toLowerCase();
+  const noise = /^(mit|with|a|euch|you|jetzt|now|the|den|die|das|einem|einer)$/i;
+  const lines = Array.from(log.querySelectorAll('div, p, span')).filter((el) => {
+    const t = norm(el.textContent);
+    if (t.length < 8 || t.length > 220 || !/raid|weitergeleitet|redirect/i.test(t)) return false;
+    if (el.querySelector(userSel) || el.closest(userSel) || el.closest(msgSel)) return false;
+    // nur die innerste Zeile mit dem Text
+    return !Array.from(el.children).some((c) => /raid|weitergeleitet|redirect/i.test(c.textContent || '') && norm(c.textContent).length >= 8);
+  });
+  for (const el of lines.reverse()) {
+    const t = norm(el.textContent);
+    let target: string | null = null;
+    let m: RegExpMatchArray | null;
+    if ((m = t.match(new RegExp('^' + NAME + '\\s+(?:hat|has)\\s+(?:raided\\s+)?' + NAME, 'i'))) && /geraidet|raided/i.test(t) && isSrc(m[1])) target = m[2];
+    else if ((m = t.match(new RegExp(NAME + '\\s+raided\\s+' + NAME, 'i'))) && isSrc(m[1])) target = m[2];
+    else if ((m = t.match(new RegExp('^' + NAME + '\\s+(?:raidet|is\\s+raiding)\\s+(?:jetzt\\s+)?' + NAME, 'i'))) && isSrc(m[1]) && !noise.test(m[2])) target = m[2];
+    else if ((m = t.match(new RegExp('(?:raid\\s+(?:zu|to|nach|auf|bei)|now\\s+raiding|raiding|raidet\\s+jetzt|(?:zu|nach)(?=\\s+@?[A-Za-z0-9_]{3,25}\\s+weitergeleitet)|redirect(?:ing|ed)?\\s+to)\\s+' + NAME, 'i')))
+      && /zuschauer|viewers|weitergeleitet|redirect|abgeschlossen|complete|erfolgreich|successful/i.test(t)) target = m[1];
+    if (target && !isSrc(target) && !noise.test(target)) {
+      // Steht der Name als Link da, gilt der Kanal aus dem Link (Anzeigename kann vom Login abweichen)
+      let login = target;
+      for (const a of Array.from(el.querySelectorAll('a[href]'))) {
+        const hm = (a.getAttribute('href') || '').match(/(?:^|twitch\.tv)\/([A-Za-z0-9_]{3,25})(?:[/?#]|$)/);
+        if (hm && norm(a.textContent).toLowerCase() === target.toLowerCase()) login = hm[1];
+      }
+      return { target: login, name: target, text: t.slice(0, 200) };
+    }
+  }
+  return null;
+}
 
 /** Klickt im Raid-Banner „Beitreten“ bzw. „Verlassen“. */
 function raidClickJs(kind: 'join' | 'leave'): string {
@@ -1111,8 +1159,14 @@ async function watchRaids(): Promise<void> {
       const target = t.chat ?? t.wv;
       if (!(t.chat ? t.chatReady : t.ready)) continue;
       try {
-        const r = (await target.executeJavaScript(RAID_JS)) as { target: string; text: string; join: boolean; leave: boolean } | null;
-        if (r && r.target.toLowerCase() !== t.login) showRaid({ source: t.login, target: r.target, guessed: false, text: r.text, join: r.join, leave: r.leave });
+        const r = (await target.executeJavaScript(RAID_JS)) as { target: string; name: string; text: string; join: boolean; leave: boolean } | null;
+        if (r && r.target.toLowerCase() !== t.login) {
+          showRaid({ source: t.login, target: r.target, name: r.name, guessed: false, text: r.text, join: r.join, leave: r.leave });
+          continue;
+        }
+        // Kein Banner (mehr)? Dann nach Twitchs Abschluss-Zeile im Chatverlauf schauen
+        const d = (await target.executeJavaScript(`(${raidDoneScan.toString()})(${JSON.stringify(t.login)}, ${JSON.stringify(nameOf(t.login))})`)) as { target: string; name: string; text: string } | null;
+        if (d && d.target.toLowerCase() !== t.login) showRaid({ source: t.login, target: d.target, name: d.name, guessed: false, done: true, text: d.text, join: false, leave: false });
       } catch {
         // Seite lädt gerade
       }
@@ -1134,6 +1188,7 @@ function showRaid(r: RaidInfo): void {
   }
   raidSeen.set(key, Date.now());
   const fromName = nameOf(r.source);
+  const targetName = channelByLogin(r.target.toLowerCase()) ? nameOf(r.target.toLowerCase()) : r.name || r.target;
   const ch = channelByLogin(r.source);
   const stack = document.getElementById('raid-stack')!;
 
@@ -1155,7 +1210,7 @@ function showRaid(r: RaidInfo): void {
     }
     openStream(r.target.toLowerCase(), { auto: false, muted: false, focus: true });
     if (src) setTimeout(() => closeTab(src.id), 1500);
-    toast(`Du raidest mit zu ${r.target}.`);
+    toast(`Du raidest mit zu ${targetName}.`);
   };
   const declineRaid = () => {
     close();
@@ -1168,12 +1223,12 @@ function showRaid(r: RaidInfo): void {
   const card: HTMLElement = h('article', { class: `raid-card${r.guessed ? ' guessed' : ''}`, 'data-key': key, role: 'alertdialog', 'aria-label': `${fromName} raidet ${r.target}` },
     h('header', { class: 'raid-head' },
       icon('sword'),
-      h('span', { class: 'raid-kicker', text: r.guessed ? 'Raid (vermutlich)' : 'Raid' }),
+      h('span', { class: 'raid-kicker', text: r.guessed ? 'Raid (vermutlich)' : r.done ? 'Raid abgeschlossen' : 'Raid' }),
       iconButton('close', 'Ausblenden', () => close(), 'raid-x')),
     h('div', { class: 'raid-main' },
       ch ? avatar(ch) : h('span', { class: 'avatar md placeholder', text: r.source[0].toUpperCase() }),
       h('p', { class: 'raid-line' },
-        h('strong', { text: fromName }), ' raidet ', h('strong', { class: 'raid-target', text: channelByLogin(r.target.toLowerCase()) ? nameOf(r.target.toLowerCase()) : r.target }))),
+        h('strong', { text: fromName }), r.done ? ' hat ' : ' raidet ', h('strong', { class: 'raid-target', text: targetName }), r.done ? ' geraidet' : null)),
     r.text ? h('p', { class: 'raid-text', text: r.text }) : null,
     r.guessed ? h('p', { class: 'raid-hint', text: 'Aus der Ansage im Chat geschlossen – der Stream ist gerade zu Ende gegangen.' }) : null,
     h('div', { class: 'raid-actions' },
