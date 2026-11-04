@@ -217,3 +217,13 @@ Aufbau:
 | `src/store.ts` | Einstellungen und Kanalliste (JSON) |
 | `src/preload.ts` | Brücke zwischen Oberfläche und Hauptprozess |
 | `src/renderer/` | Oberfläche (Seitenleiste, Übersicht, Giveaways, Erkennungswörter, Tabs mit Mod-Ansicht, Kanalpunkte, Einstellungen) |
+
+## Lizenz
+
+Copyright © 2026 areadox
+
+Kanalwache ist freie Software: Du kannst sie unter den Bedingungen der **GNU General Public License, Version 3** oder (nach deiner Wahl) jeder späteren Version, wie von der Free Software Foundation veröffentlicht, weitergeben und/oder verändern. Wer eine veränderte Version weitergibt, muss sie ebenfalls unter der GPL samt Quellcode weitergeben.
+
+Kanalwache wird in der Hoffnung verbreitet, dass es nützlich ist, aber **ohne jede Gewährleistung** – sogar ohne die implizite Gewährleistung der Marktfähigkeit oder Eignung für einen bestimmten Zweck. Den vollständigen Lizenztext findest du in der Datei [`LICENSE`](LICENSE).
+
+Kanalwache ist ein privates Projekt und steht in keiner Verbindung zu Twitch; „Twitch“ ist eine Marke von Twitch Interactive, Inc.

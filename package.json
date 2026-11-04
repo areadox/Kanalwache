@@ -1,10 +1,10 @@
 {
   "name": "kanalwache",
   "productName": "Kanalwache",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "Eigener Twitch-Viewer: dein Kanal und deine Lieblingskanäle an einem Ort, mit automatischem Zuschauen, sobald jemand live geht.",
   "author": "areadox",
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "repository": "github:areadox/Kanalwache",
   "main": "dist/main.js",
   "scripts": {
@@ -17,7 +17,8 @@
     "productName": "Kanalwache",
     "files": [
       "dist/**/*",
-      "package.json"
+      "package.json",
+      "LICENSE"
     ],
     "directories": {
       "output": "release"
