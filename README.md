@@ -210,7 +210,7 @@ Einstellungen und Login liegen unter `%APPDATA%\Kanalwache`.
 
 ## Releases
 
-Releases entstehen automatisch: Der Workflow `.github/workflows/release.yml` prüft bei jedem Push auf `main`, ob die Version aus `package.json` schon als Tag existiert. Ist sie neu, baut GitHub Actions unter Windows den Installer und die portable `.exe` und veröffentlicht sie als Release `vX.Y.Z` – mit der Commit-Nachricht als Beschreibung. Für eine neue Version reicht es also, die Version in `package.json` zu erhöhen und zu pushen.
+Releases entstehen nur auf Ansage: Der Workflow `.github/workflows/release.yml` läuft, wenn `main` auf den Branch `release` übernommen wird (oder von Hand über **Actions → Release → Run workflow**). Er prüft, ob die Version aus `package.json` schon als Tag existiert; ist sie neu, baut GitHub Actions unter Windows den Installer und die portable `.exe` und veröffentlicht sie als Release `vX.Y.Z` – mit der Commit-Nachricht als Beschreibung. Normale Pushes auf `main` veröffentlichen nichts.
 
 ### Release-Meldung an Discord
 

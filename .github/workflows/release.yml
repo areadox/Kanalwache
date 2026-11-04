@@ -1,12 +1,14 @@
-# Baut Kanalwache für Windows und veröffentlicht ein Release, sobald auf main
-# eine neue Version in package.json steht (z. B. 0.0.3 → Tag v0.0.3).
-# Steht die Version schon als Tag im Repo, passiert nichts.
+# Baut Kanalwache für Windows und veröffentlicht ein Release – aber nur auf Ansage:
+#  - Push auf den Branch „release“ (main wird dorthin übernommen, wenn veröffentlicht werden soll), oder
+#  - von Hand über „Run workflow“.
+# Pushes auf main lösen nichts aus. Release-Tag ist die Version aus package.json (z. B. 0.0.8 → v0.0.8);
+# gibt es den Tag schon, passiert nichts.
 # Danach geht eine Meldung an Discord, wenn das Secret DISCORD_WEBHOOK_URL gesetzt ist.
 name: Release
 
 on:
   push:
-    branches: [main]
+    branches: [release]
   workflow_dispatch:
     inputs:
       announce_only:
