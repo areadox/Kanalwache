@@ -862,6 +862,63 @@ function setupQuickDialog(): void {
   document.getElementById('btn-quick')!.addEventListener('click', openQuickDialog);
 }
 
+// ---------- Updates ----------
+
+let updToastFor = '';
+
+function renderUpdate(next: AppState): void {
+  const box = document.getElementById('update-box')!;
+  const u = next.update.state;
+  // Einmal pro Version kurz Bescheid sagen
+  const key = u.kind === 'available' || u.kind === 'ready' ? `${u.kind}:${u.version}` : '';
+  if (key && key !== updToastFor) {
+    updToastFor = key;
+    if (u.kind === 'ready') toast(`Update auf ${u.version} ist bereit – „Jetzt neu starten“ links unten.`);
+    else if (u.kind === 'available' && next.update.portable) toast(`Kanalwache ${u.version} ist da.`);
+  }
+  if (u.kind === 'available' && next.update.portable) {
+    box.replaceChildren(h('div', { class: 'upd-box' },
+      h('div', { class: 'upd-text' }, h('strong', { text: `Kanalwache ${u.version} ist da` }), h('span', { class: 'muted', text: `Du hast ${next.update.version}` })),
+      h('div', { class: 'upd-actions' },
+        h('button', { type: 'button', class: 'btn primary small', text: 'Herunterladen', onclick: () => void api.updateDownload() }),
+        h('button', { type: 'button', class: 'link-btn', text: 'Was ist neu?', onclick: () => void api.updateNotes() }))));
+  } else if (u.kind === 'available' || u.kind === 'downloading') {
+    const pct = u.kind === 'downloading' ? u.percent : 0;
+    const bar = h('span', { class: 'upd-bar-fill' });
+    bar.style.width = `${pct}%`;
+    box.replaceChildren(h('div', { class: 'upd-box' },
+      h('div', { class: 'upd-text' }, h('strong', { text: `Update ${u.version} wird geladen …` }), h('span', { class: 'muted', text: `${pct} %` })),
+      h('span', { class: 'upd-bar' }, bar)));
+  } else if (u.kind === 'ready') {
+    box.replaceChildren(h('div', { class: 'upd-box ready' },
+      h('div', { class: 'upd-text' }, h('strong', { text: `Update ${u.version} ist bereit` }), h('span', { class: 'muted', text: 'Wird sonst beim Beenden installiert' })),
+      h('div', { class: 'upd-actions' },
+        h('button', { type: 'button', class: 'btn primary small', text: 'Jetzt neu starten', onclick: () => void api.updateInstall() }),
+        h('button', { type: 'button', class: 'link-btn', text: 'Was ist neu?', onclick: () => void api.updateNotes() }))));
+  } else {
+    box.replaceChildren();
+  }
+  if ((document.getElementById('settings') as HTMLDialogElement).open) renderUpdateSettings();
+}
+
+function renderUpdateSettings(): void {
+  if (!state) return;
+  const u = state.update;
+  document.getElementById('upd-version')!.textContent = `Version ${u.version} · ${u.portable ? 'portable' : 'installiert'}`;
+  const st = u.state;
+  const btn = document.getElementById('btn-upd-check') as HTMLButtonElement;
+  btn.disabled = st.kind === 'checking' || st.kind === 'downloading';
+  document.getElementById('upd-status')!.textContent =
+    !u.supported ? 'Updates gibt es nur in der fertigen App.'
+      : st.kind === 'checking' ? 'Suche nach Updates …'
+        : st.kind === 'none' ? `Kanalwache ist aktuell (geprüft ${new Date(st.checkedAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}).`
+          : st.kind === 'available' ? (u.portable ? `Version ${st.version} ist verfügbar – „Herunterladen“ links unten lädt die neue portable .exe.` : `Version ${st.version} wird geladen …`)
+            : st.kind === 'downloading' ? `Version ${st.version} wird geladen … ${st.percent} %`
+              : st.kind === 'ready' ? `Version ${st.version} ist bereit – „Jetzt neu starten“ oder beim Beenden.`
+                : st.kind === 'error' ? `Update-Prüfung fehlgeschlagen: ${st.message}`
+                  : u.portable ? 'Die portable Version zeigt neue Versionen an; heruntergeladen wird über den Browser.' : 'Neue Versionen werden im Hintergrund geladen und beim Neustart installiert.';
+}
+
 // ---------- Ton: nur ein Tab ----------
 
 /** Tab, aus dem der Ton kommt (nur wenn „Ton nur aus einem Tab“ an ist) */
@@ -2476,6 +2533,7 @@ function setupSettings(): void {
 
 function syncSettingsForm(): void {
   if (!state) return;
+  renderUpdateSettings();
   void api.recDir().then((d) => { document.getElementById('rec-dir')!.textContent = d; });
   const dialog = document.getElementById('settings')!;
   for (const el of dialog.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-setting]')) {
@@ -2542,6 +2600,7 @@ function applyState(next: AppState): void {
   renderSidebar();
   renderHome();
   renderGiveaways();
+  renderUpdate(next);
   renderTabBar();
 }
 
@@ -2569,6 +2628,7 @@ async function main(): Promise<void> {
   setInterval(() => void watchRaids(), 2500);
   setupRecording();
   setupQuickDialog();
+  document.getElementById('btn-upd-check')!.addEventListener('click', () => void api.updateCheck());
   setInterval(() => void syncVolumes(), 1000);
   setupTabList();
   api.onToast(toast);

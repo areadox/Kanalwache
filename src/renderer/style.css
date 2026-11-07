@@ -835,3 +835,19 @@ main { position: relative; }
 .qm-row .icon-btn.off { opacity: .25; pointer-events: none; }
 .qm-actions { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; }
 .settings code { padding: 1px 5px; border-radius: 4px; background: var(--bg); font-size: 12px; }
+
+/* ---------- Update-Hinweis ---------- */
+#update-box:empty { display: none; }
+#update-box { padding: 0 10px 8px; }
+.upd-box {
+  display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-radius: 10px;
+  background: linear-gradient(135deg, rgba(61, 220, 151, .14), rgba(61, 220, 151, .04)); border: 1px solid rgba(61, 220, 151, .4);
+}
+.upd-box.ready { border-color: var(--ok); }
+.upd-text { display: flex; flex-direction: column; gap: 1px; font-size: 13px; }
+.upd-text strong { color: #c9f7e2; }
+.upd-text .muted { font-size: 12px; }
+.upd-actions { display: flex; align-items: center; gap: 10px; }
+.upd-bar { display: block; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, .08); overflow: hidden; }
+.upd-bar-fill { display: block; height: 100%; background: var(--ok); transition: width .3s; }
+.upd-row { justify-content: space-between; }

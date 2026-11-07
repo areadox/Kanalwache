@@ -33,6 +33,7 @@
       <button type="button" id="btn-follows" class="link-btn follows-link">Gefolgte Kanäle übernehmen …</button>
     </section>
 
+    <div id="update-box"></div>
     <footer class="sidebar-foot">
       <span id="last-check"></span>
       <button id="btn-check" class="icon-btn" title="Jetzt prüfen"></button>
@@ -86,6 +87,11 @@
       <h3>Gefolgte Kanäle</h3>
       <label class="row"><input type="checkbox" data-setting="syncFollows"> Automatisch abgleichen: neue Follows hinzufügen, entfolgte entfernen</label>
       <div class="row"><button type="button" class="btn small" id="btn-follows-2">Gefolgte Kanäle übernehmen …</button></div>
+      <h3>Updates</h3>
+      <div class="row upd-row"><span id="upd-version" class="muted"></span>
+        <button type="button" class="btn small" id="btn-upd-check">Jetzt nach Updates suchen</button></div>
+      <label class="row"><input type="checkbox" data-setting="autoUpdate"> Beim Start und alle 6 Stunden automatisch nach Updates suchen</label>
+      <p id="upd-status" class="muted rule-hint"></p>
       <h3>Raids</h3>
       <label class="row"><input type="checkbox" data-setting="raidPrompt"> Bei Raids nachfragen, ob du mitraiden willst</label>
       <h3>Streams &amp; Fenster</h3>

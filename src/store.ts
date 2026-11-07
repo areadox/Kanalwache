@@ -35,6 +35,8 @@ export interface Settings {
   showFavBar: boolean;
   /** Bei Raids nachfragen: Mitraiden oder nicht */
   raidPrompt: boolean;
+  /** Beim Start und alle 6 Stunden nach Updates suchen */
+  autoUpdate: boolean;
   /** Aufnahmen: Zielordner (leer = Videos\\Kanalwache) und Qualität */
   recordDir: string;
   recordQuality: 'high' | 'medium' | 'low';
@@ -102,6 +104,7 @@ export const DEFAULT_SETTINGS: Settings = {
   singleAudio: true,
   showFavBar: true,
   raidPrompt: true,
+  autoUpdate: true,
   recordDir: '',
   recordQuality: 'high',
   followNotify: true,

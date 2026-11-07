@@ -34,6 +34,7 @@ interface AppSettings {
   singleAudio: boolean;
   showFavBar: boolean;
   raidPrompt: boolean;
+  autoUpdate: boolean;
   recordDir: string;
   recordQuality: 'high' | 'medium' | 'low';
   followNotify: boolean;
@@ -115,7 +116,17 @@ interface AppState {
   quickMessages: QuickMessage[];
   /** Dein eigener Kanal, wenn du mit diesem Account angemeldet bist */
   broadcaster: string | null;
+  update: { state: UpdateState; version: string; portable: boolean; supported: boolean };
 }
+
+type UpdateState =
+  | { kind: 'idle'; checkedAt: number | null }
+  | { kind: 'checking' }
+  | { kind: 'none'; checkedAt: number }
+  | { kind: 'available'; version: string; url: string; download: string | null; portable: boolean }
+  | { kind: 'downloading'; version: string; percent: number }
+  | { kind: 'ready'; version: string }
+  | { kind: 'error'; message: string };
 
 type ViewMode = 'viewer' | 'mod' | 'manager';
 
@@ -165,6 +176,10 @@ interface KanalwacheApi {
   onStopAllRecordings(cb: () => void): void;
   onShortcut(cb: (name: string) => void): void;
   setOpenChannels(list: string[]): Promise<void>;
+  updateCheck(): Promise<void>;
+  updateDownload(): Promise<void>;
+  updateInstall(): Promise<void>;
+  updateNotes(): Promise<void>;
   chatSend(channel: string, text: string): Promise<Result>;
   setQuickMessages(list: QuickMessage[]): Promise<QuickMessage[]>;
   raidNotify(source: string, target: string): Promise<void>;

@@ -204,6 +204,16 @@ Kanalwache erkennt automatisch, auf welchen deiner Kanäle du Moderator bist –
 
 Einstellungen und Login liegen unter `%APPDATA%\Kanalwache`.
 
+## Updates
+
+Kanalwache sucht beim Start und danach alle 6 Stunden auf GitHub nach einer neuen Version (abschaltbar unter Einstellungen → *Updates*, dort auch **Jetzt nach Updates suchen** und die aktuelle Versionsnummer).
+
+- **Installierte Version** (`Kanalwache-Setup-x.y.z.exe`): Das Update wird im Hintergrund geladen; links unten erscheint **„Update x.y.z ist bereit – Jetzt neu starten“**. Ohne Klick wird es beim nächsten Beenden installiert. Im Infobereich-Menü gibt es dafür ebenfalls einen Eintrag.
+- **Portable Version**: Eine laufende `.exe` kann sich nicht selbst ersetzen. Links unten erscheint **„Kanalwache x.y.z ist da – Herunterladen“**; der Knopf lädt die neue portable `.exe` über den Browser.
+- **Was ist neu?** öffnet die Release-Seite mit allen Änderungen.
+
+Die Update-Funktion gibt es ab Version 0.0.8 – ältere Versionen müssen einmal von Hand aktualisiert werden.
+
 ## Hinweise
 
 - Der Live-Status kommt über dieselbe Schnittstelle, die auch twitch.tv selbst nutzt – dafür ist kein eigener API-Schlüssel nötig. Fällt sie aus, wertet Kanalwache die Kanalseite direkt aus.
@@ -213,7 +223,7 @@ Einstellungen und Login liegen unter `%APPDATA%\Kanalwache`.
 
 ## Releases
 
-Releases entstehen nur auf Ansage: Der Workflow `.github/workflows/release.yml` läuft, wenn `main` auf den Branch `release` übernommen wird (oder von Hand über **Actions → Release → Run workflow**). Er prüft, ob die Version aus `package.json` schon als Tag existiert; ist sie neu, baut GitHub Actions unter Windows den Installer und die portable `.exe` und veröffentlicht sie als Release `vX.Y.Z` – mit der Commit-Nachricht als Beschreibung. Normale Pushes auf `main` veröffentlichen nichts.
+Releases entstehen nur auf Ansage: Der Workflow `.github/workflows/release.yml` läuft, wenn `main` auf den Branch `release` übernommen wird (oder von Hand über **Actions → Release → Run workflow**). Er prüft, ob die Version aus `package.json` schon als Tag existiert; ist sie neu, baut GitHub Actions unter Windows den Installer und die portable `.exe` und veröffentlicht sie als Release `vX.Y.Z` (dazu `latest.yml` und `.blockmap` für die Update-Funktion der installierten Version) – mit der Commit-Nachricht als Beschreibung. Normale Pushes auf `main` veröffentlichen nichts.
 
 ### Release-Meldung an Discord
 
@@ -246,6 +256,7 @@ Aufbau:
 | `src/giveaway.ts` | Giveaway-Erkennung (Start, Teilnehmer, Ende, Gewinner) |
 | `src/raid.ts` | Raid-Ansagen im Chat erkennen |
 | `src/rules.ts` | Erkennungswörter: Standardlisten, Prüfung, Umwandlung in Suchmuster |
+| `src/updater.ts` | Update-Funktion (Installer: electron-updater, portabel: Prüfen + Download-Link) |
 | `src/recorder.ts` | Aufnahmen stückweise auf die Platte schreiben |
 | `src/store.ts` | Einstellungen und Kanalliste (JSON) |
 | `src/preload.ts` | Brücke zwischen Oberfläche und Hauptprozess |

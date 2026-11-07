@@ -74,8 +74,13 @@ jobs:
           # Release-Text aus der Commit-Nachricht (ohne Sitzungs-Zeile)
           git log -1 --format=%B | grep -v '^Claude-Session:' > notes.md
           printf '\n---\n**Download:** `Kanalwache-%s-portable.exe` starten (keine Installation nötig) oder `Kanalwache-Setup-%s.exe` installieren.\n' "$VERSION" "$VERSION" >> notes.md
+          # Dateien fürs Release: portable .exe, Installer und – für die Update-Funktion der installierten Version –
+          # latest.yml samt Blockmap
+          files=(release/Kanalwache-*.exe)
+          [ -f release/latest.yml ] && files+=(release/latest.yml) || echo "::warning::latest.yml fehlt – installierte Versionen finden dieses Update nicht."
+          for b in release/*.blockmap; do [ -f "$b" ] && files+=("$b"); done
           gh release create "v$VERSION" \
-            release/Kanalwache-*.exe \
+            "${files[@]}" \
             --target "$GITHUB_SHA" \
             --title "Kanalwache v$VERSION" \
             --notes-file notes.md
@@ -105,8 +110,8 @@ jobs:
           url=$(jq -r .url rel.json)
           # Änderungen: Release-Text ohne die Download-Zeile, für Discord gekürzt
           body=$(jq -r .body rel.json | sed '/^---$/,$d' | sed '1s/^v[0-9.]*: *//; 1s/^/**/; 1s/$/**/' | sed '/^$/N;/^\n$/D' | head -c 3500)
-          portable=$(jq -r '.assets[] | select(.name | test("portable")) | .url' rel.json | head -1)
-          setup=$(jq -r '.assets[] | select(.name | test("Setup")) | .url' rel.json | head -1)
+          portable=$(jq -r '.assets[] | select(.name | test("portable\\.exe$")) | .url' rel.json | head -1)
+          setup=$(jq -r '.assets[] | select(.name | test("Setup.*\\.exe$")) | .url' rel.json | head -1)
           downloads=""
           [ -n "$portable" ] && downloads="[Portable .exe]($portable) – einfach starten"
           [ -n "$setup" ] && downloads="$downloads"$'\n'"[Installer]($setup) – mit Startmenü-Eintrag"

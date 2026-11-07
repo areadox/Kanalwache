@@ -1,6 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, Notification, session, shell, Tray, webContents } from 'electron';
 import { RecordingFiles } from './recorder';
 import { extractRaidTarget } from './raid';
+import { Updater } from './updater';
 import * as path from 'node:path';
 import { clampPoll, normalizeLogin, sanitizeQuickMessages, Settings, Store } from './store';
 import { ChannelStatus, fetchFollows, fetchModChannels, fetchStatuses, FollowedChannel } from './twitch';
@@ -344,6 +345,13 @@ if (!app.requestSingleInstanceLock()) {
   app.whenReady().then(init);
 }
 
+// ---------- Updates ----------
+
+const updater = new Updater(() => {
+  pushState();
+  updateTrayMenu();
+});
+
 // ---------- Aufnahmen ----------
 
 const recordings = new RecordingFiles((id, message) => win?.webContents.send('rec-error', id, message));
@@ -429,6 +437,7 @@ async function init(): Promise<void> {
   registerIpc();
   await refreshAuth();
   schedulePoll(0);
+  updater.start(store.config.settings.autoUpdate);
   setInterval(() => detector.sweep(), 60_000);
   setInterval(() => void syncFollows(), 10 * 60_000);
 }
@@ -567,6 +576,9 @@ function updateTrayMenu(): void {
       },
     });
     items.push({ type: 'separator' });
+  }
+  if (updater?.state.kind === 'ready') {
+    items.push({ label: `⬆ Update auf ${updater.state.version} installieren`, click: () => updater.installNow() }, { type: 'separator' });
   }
   items.push(
     { label: 'Kanalwache öffnen', click: showWindow },
@@ -718,6 +730,7 @@ function buildState() {
     mods: modChannels(),
     starred: starredList(),
     quickMessages: store.config.quickMessages,
+    update: { state: updater.state, version: app.getVersion(), portable: updater.portable, supported: updater.supported },
     broadcaster: ownBroadcasterLogin(),
     giveawayRules: store.config.giveawayRules,
     defaultRules: DEFAULT_RULES,
@@ -839,13 +852,14 @@ function registerIpc(): void {
     if (!patch || typeof patch !== 'object') return;
     const p = patch as Partial<Settings>;
     const s = store.config.settings;
-    for (const key of ['closeToTray', 'startInTray', 'autostart', 'muteAutoOpened', 'closeTabWhenOffline', 'giveawayHelper', 'giveawayNotify', 'autoClaimPoints', 'syncFollows', 'followNotify', 'followAutoOpen', 'fullPage', 'singleAudio', 'showFavBar', 'raidPrompt'] as const) {
+    for (const key of ['closeToTray', 'startInTray', 'autostart', 'muteAutoOpened', 'closeTabWhenOffline', 'giveawayHelper', 'giveawayNotify', 'autoClaimPoints', 'syncFollows', 'followNotify', 'followAutoOpen', 'fullPage', 'singleAudio', 'showFavBar', 'raidPrompt', 'autoUpdate'] as const) {
       if (typeof p[key] === 'boolean') s[key] = p[key] as boolean;
     }
     if (typeof p.pollSeconds === 'number') s.pollSeconds = clampPoll(p.pollSeconds);
     if (p.recordQuality === 'high' || p.recordQuality === 'medium' || p.recordQuality === 'low') s.recordQuality = p.recordQuality;
     applyAutostart();
     if (p.syncFollows === true) void syncFollows();
+    if (typeof p.autoUpdate === 'boolean') updater.setAuto(p.autoUpdate);
     syncChat();
     saveAndPush(typeof p.pollSeconds === 'number');
   });
@@ -961,6 +975,11 @@ function registerIpc(): void {
     n.on('click', () => showWindow());
     n.show();
   });
+
+  ipcMain.handle('update-check', () => updater.check(true));
+  ipcMain.handle('update-download', () => updater.download());
+  ipcMain.handle('update-install', () => updater.installNow());
+  ipcMain.handle('update-notes', () => updater.openReleaseNotes());
 
   ipcMain.handle('set-open-channels', (_e, list: unknown) => {
     if (!Array.isArray(list)) return;
