@@ -2,7 +2,7 @@ import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeImage, nati
 import { RecordingFiles } from './recorder';
 import { extractRaidTarget } from './raid';
 import * as path from 'node:path';
-import { clampPoll, normalizeLogin, Settings, Store } from './store';
+import { clampPoll, normalizeLogin, sanitizeQuickMessages, Settings, Store } from './store';
 import { ChannelRewards, ChannelStatus, fetchFollows, fetchModChannels, fetchRewards, fetchStatuses, FollowedChannel } from './twitch';
 import { TwitchChat } from './chat';
 import { analyzeAnnouncement, ENTRY_RE, Giveaway, GiveawayDetector } from './giveaway';
@@ -152,6 +152,7 @@ const chat = new TwitchChat({
   },
   onUserState: (channel, isMod) => {
     finishJoin(channel, null);
+    finishSend(channel, null);
     if (!chat.canSend) return;
     if (ircMods.get(channel) !== isMod) {
       ircMods.set(channel, isMod);
@@ -160,6 +161,7 @@ const chat = new TwitchChat({
   },
   onNotice: (channel, msgId, text) => {
     if (pendingJoins.has(channel) && /^(msg_|unrecognized_cmd|no_permission)/.test(msgId)) finishJoin(channel, noticeText(msgId, text));
+    if (pendingSends.has(channel) && /^(msg_|unrecognized_cmd|no_permission)/.test(msgId)) finishSend(channel, noticeText(msgId, text));
   },
   onStatus: () => pushState(),
 });
@@ -227,6 +229,53 @@ const detector = new GiveawayDetector(() => auth.user?.toLowerCase() ?? null, ru
   },
 });
 
+// ---------- Nachrichten in den Chat (Schnellleiste) ----------
+
+/** Gesendete Nachrichten, auf deren Bestätigung durch Twitch gewartet wird (Kanal → Rückmeldung) */
+const pendingSends = new Map<string, { resolve: (error: string | null) => void; timer: NodeJS.Timeout }>();
+const lastSend = new Map<string, number>();
+
+function finishSend(channel: string, error: string | null): void {
+  const p = pendingSends.get(channel);
+  if (!p) return;
+  clearTimeout(p.timer);
+  pendingSends.delete(channel);
+  p.resolve(error);
+}
+
+async function sendChat(channelRaw: unknown, textRaw: unknown): Promise<{ ok: boolean; error?: string }> {
+  const channel = typeof channelRaw === 'string' ? normalizeLogin(channelRaw) : null;
+  const text = typeof textRaw === 'string' ? textRaw.replace(/[\r\n]+/g, ' ').trim().slice(0, 500) : '';
+  if (!channel || !text) return { ok: false, error: 'Leere Nachricht.' };
+  if (/^[/.]/.test(text)) return { ok: false, error: 'Befehle mit / oder . gehen über die Schnellleiste nicht – nur normale Nachrichten und !befehle.' };
+  if (!auth.loggedIn) return { ok: false, error: 'Zum Schreiben musst du bei Twitch angemeldet sein.' };
+  if (pendingSends.has(channel)) return { ok: false, error: 'Die letzte Nachricht wird noch gesendet.' };
+  const since = Date.now() - (lastSend.get(channel) ?? 0);
+  if (since < 1500) return { ok: false, error: 'Nicht so schnell – kurz warten.' };
+  // Kanal ggf. erst betreten
+  if (!chat.isJoined(channel)) {
+    openTabChannels.add(channel);
+    syncChat();
+    for (let i = 0; i < 30 && !(chat.canSend && chat.isJoined(channel)); i++) await new Promise((r) => setTimeout(r, 200));
+  }
+  if (!chat.canSend) {
+    return {
+      ok: false,
+      error: chat.authProblem
+        ? 'Twitch nimmt den Login für den Chat nicht an. In den Einstellungen ab- und wieder anmelden.'
+        : 'Der Chat ist gerade nicht verbunden – gleich nochmal versuchen.',
+    };
+  }
+  if (!chat.send(channel, text)) return { ok: false, error: 'Senden ging nicht – Chat noch nicht bereit.' };
+  lastSend.set(channel, Date.now());
+  // Twitch bestätigt mit USERSTATE oder lehnt mit NOTICE ab (z. B. Follower-only, Slow-Mode)
+  const error = await new Promise<string | null>((resolve) => {
+    const timer = setTimeout(() => finishSend(channel, null), 4000);
+    pendingSends.set(channel, { resolve, timer });
+  });
+  return error ? { ok: false, error } : { ok: true };
+}
+
 function noticeText(msgId: string, fallback: string): string {
   if (msgId.startsWith('msg_followersonly')) return 'In diesem Chat dürfen nur Follower schreiben.';
   if (msgId === 'msg_subsonly') return 'In diesem Chat dürfen nur Abonnenten schreiben.';
@@ -271,10 +320,14 @@ function joinGiveaway(id: string, entryInput: string): { ok: boolean; error?: st
 }
 
 /** Welche Chats mitgelesen werden: alle Lieblingskanäle, die gerade live sind (dein eigener nicht). */
+/** Kanäle, die gerade als Stream-Tab offen sind (für Schnellnachrichten) */
+let openTabChannels = new Set<string>();
+
 function syncChat(): void {
   const wanted = store.config.settings.giveawayHelper
     ? store.config.favorites.map((f) => f.login).filter((l) => statuses.get(l)?.live)
     : [];
+  for (const l of openTabChannels) if (!wanted.includes(l)) wanted.push(l);
   for (const g of detector.list()) if (!wanted.includes(g.channel)) detector.endChannel(g.channel);
   chat.setChannels(wanted);
 }
@@ -665,6 +718,7 @@ function buildState() {
     giveaways: detector.list(),
     mods: modChannels(),
     starred: starredList(),
+    quickMessages: store.config.quickMessages,
     broadcaster: ownBroadcasterLogin(),
     giveawayRules: store.config.giveawayRules,
     defaultRules: DEFAULT_RULES,
@@ -923,6 +977,20 @@ function registerIpc(): void {
     });
     n.on('click', () => showWindow());
     n.show();
+  });
+
+  ipcMain.handle('set-open-channels', (_e, list: unknown) => {
+    if (!Array.isArray(list)) return;
+    openTabChannels = new Set(list.map((x) => (typeof x === 'string' ? normalizeLogin(x) : null)).filter((x): x is string => !!x));
+    syncChat();
+  });
+
+  ipcMain.handle('chat-send', (_e, channel: unknown, text: unknown) => sendChat(channel, text));
+
+  ipcMain.handle('set-quick-messages', (_e, list: unknown) => {
+    store.config.quickMessages = sanitizeQuickMessages(list);
+    saveAndPush(false);
+    return store.config.quickMessages;
   });
 
   ipcMain.handle('copy-text', (_e, text: unknown) => {

@@ -45,6 +45,35 @@ export interface Settings {
   followAutoOpen: boolean;
 }
 
+export interface QuickMessage {
+  /** Beschriftung des Knopfs */
+  label: string;
+  /** Was in den Chat geschrieben wird; {kanal} und {ich} werden ersetzt */
+  text: string;
+}
+
+export const DEFAULT_QUICK_MESSAGES: QuickMessage[] = [
+  { label: '👋 Hallo', text: 'Hallo {kanal} 👋' },
+  { label: 'GG', text: 'GG! 🎉' },
+  { label: 'Lurk', text: '!lurk' },
+  { label: '❤️ Danke', text: 'Danke für den Stream, {kanal}! ❤️' },
+];
+
+export function sanitizeQuickMessages(raw: unknown): QuickMessage[] {
+  if (!Array.isArray(raw)) return DEFAULT_QUICK_MESSAGES.map((m) => ({ ...m }));
+  const out: QuickMessage[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const r = item as Record<string, unknown>;
+    const text = typeof r.text === 'string' ? r.text.replace(/[\r\n]+/g, ' ').trim().slice(0, 450) : '';
+    if (!text) continue;
+    const label = (typeof r.label === 'string' && r.label.trim() ? r.label.trim() : text).slice(0, 24);
+    out.push({ label, text });
+    if (out.length >= 20) break;
+  }
+  return out;
+}
+
 export interface Config {
   own: ChannelConfig | null;
   favorites: ChannelConfig[];
@@ -54,6 +83,8 @@ export interface Config {
   ignoredFollows: string[];
   /** Favoriten (★) in deiner Reihenfolge – erscheinen in der Favoritenleiste */
   starred: string[];
+  /** Schnellnachrichten für die Leiste unter dem Player */
+  quickMessages: QuickMessage[];
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -137,6 +168,7 @@ export class Store {
       favorites,
       settings,
       giveawayRules: sanitizeRules(raw.giveawayRules),
+      quickMessages: sanitizeQuickMessages(raw.quickMessages),
       starred: Array.isArray(raw.starred)
         ? [...new Set((raw.starred as unknown[]).map((x) => (typeof x === 'string' ? normalizeLogin(x) : null)).filter((x): x is string => !!x))]
         : [],

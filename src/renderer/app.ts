@@ -132,6 +132,8 @@ interface Tab {
   /** Laufende Aufnahme (nur in Mod-Kanälen) */
   rec: Recording | null;
   recStarting: boolean;
+  /** Schnellleiste unter dem Player (nur kompakte Ansicht) */
+  qbar: HTMLElement | null;
 }
 
 const tabs = new Map<string, Tab>();
@@ -247,6 +249,10 @@ function buildTabContent(t: Tab): void {
     if (t.wv !== wv) return;
     t.ready = true;
     if (wantMuted(t)) wv.setAudioMuted(true);
+    // Gespeicherte Lautstärke übernehmen, sobald das Video da ist
+    if (t.kind === 'stream' && quickVolume < 100) {
+      void wv.executeJavaScript(`new Promise((done) => { let n = 0; const go = () => { const v = document.querySelector('video'); if (v) { v.volume = ${quickVolume / 100}; done(true); } else if (n++ < 40) setTimeout(go, 250); else done(false); }; go(); })`).catch(() => {});
+    }
     renderTabBar();
   };
   if (t.kind === 'stream' && t.login && isCompact(t)) {
@@ -257,7 +263,7 @@ function buildTabContent(t: Tab): void {
     });
     t.view.className = 'view stream compact' + (t.id === activeId ? ' active' : '');
     t.view.replaceChildren(
-      h('div', { class: 'player-pane' }, t.wv),
+      h('div', { class: 'player-pane' }, h('div', { class: 'player-stage' }, t.wv), (t.qbar = buildQuickbar(t))),
       makeSplitter(),
       h('div', { class: 'chat-pane' }, t.chat),
     );
@@ -320,7 +326,7 @@ function openStream(login: string, opts: { auto: boolean; muted: boolean; focus:
   const tab: Tab = {
     id, kind: 'stream', login, auto: opts.auto, button: h('div'), view,
     wv: null as unknown as WebviewEl, ready: false, chat: null, chatReady: false, muted: opts.muted,
-    mode, claims: 0, balance: null, playing: null, rec: null, recStarting: false,
+    mode, claims: 0, balance: null, playing: null, rec: null, recStarting: false, qbar: null,
   };
   buildTabContent(tab);
   tabs.set(id, tab);
@@ -342,7 +348,7 @@ function openLogin(): void {
   const tab: Tab = {
     id, kind: 'login', login: null, auto: false, button: h('div'), view,
     wv: null as unknown as WebviewEl, ready: false, chat: null, chatReady: false, muted: false,
-    mode: 'viewer', claims: 0, balance: null, playing: null, rec: null, recStarting: false,
+    mode: 'viewer', claims: 0, balance: null, playing: null, rec: null, recStarting: false, qbar: null,
   };
   buildTabContent(tab);
   tabs.set(id, tab);
@@ -641,6 +647,160 @@ function renderTabBar(): void {
   updateScrollButtons();
   if (tabListOpen) renderTabList();
   renderFavBar();
+  updateQuickbars();
+  syncOpenChannels();
+}
+
+// ---------- Schnellleiste unter dem Player ----------
+
+let quickVolume = (() => { try { const v = Number(localStorage.getItem('kw.volume')); return Number.isFinite(v) && v > 0 ? Math.min(100, v) : 100; } catch { return 100; } })();
+let openChannelsKey = '';
+
+/** Meldet dem Hauptprozess, welche Kanäle als Tab offen sind – dort wird der Chat zum Schreiben verbunden. */
+function syncOpenChannels(): void {
+  const list = [...tabs.values()].filter((t) => t.kind === 'stream' && t.login).map((t) => t.login!).sort();
+  const key = list.join(',');
+  if (key === openChannelsKey) return;
+  openChannelsKey = key;
+  void api.setOpenChannels(list);
+}
+
+function expandMessage(text: string, t: Tab): string {
+  const ch = t.login ? channelByLogin(t.login) : undefined;
+  return text
+    .replace(/\{kanal\}/gi, ch ? displayName(ch) : t.login ?? '')
+    .replace(/\{ich\}/gi, state?.auth.user ?? '');
+}
+
+function setVolume(t: Tab, v: number): void {
+  quickVolume = Math.max(0, Math.min(100, Math.round(v)));
+  try { localStorage.setItem('kw.volume', String(quickVolume)); } catch { /* egal */ }
+  if (!t.ready) return;
+  void t.wv.executeJavaScript(`(() => { const v = document.querySelector('video'); if (v) { v.volume = ${quickVolume / 100}; if (${quickVolume} > 0) v.muted = false; } })()`).catch(() => {});
+}
+
+async function sendQuick(t: Tab, m: QuickMessage, btn: HTMLButtonElement): Promise<void> {
+  if (!t.login || btn.classList.contains('sending')) return;
+  if (!state?.auth.loggedIn) {
+    toast('Zum Schreiben im Chat musst du bei Twitch angemeldet sein.');
+    return;
+  }
+  btn.classList.add('sending');
+  const r = await api.chatSend(t.login, expandMessage(m.text, t));
+  btn.classList.remove('sending');
+  if (r.ok) {
+    btn.classList.add('sent');
+    setTimeout(() => btn.classList.remove('sent'), 1400);
+  } else {
+    btn.classList.add('failed');
+    setTimeout(() => btn.classList.remove('failed'), 1600);
+    toast(r.error ?? 'Senden ging nicht.');
+  }
+}
+
+function buildQuickbar(t: Tab): HTMLElement {
+  const bar = h('div', { class: 'quickbar', role: 'toolbar', 'aria-label': 'Schnellleiste' });
+  fillQuickbar(t, bar);
+  return bar;
+}
+
+function fillQuickbar(t: Tab, bar: HTMLElement): void {
+  const muted = t.ready && t.wv.isAudioMuted();
+  const single = singleAudio();
+  const vol = h('input', { type: 'range', min: '0', max: '100', step: '1', value: String(quickVolume), class: 'qb-vol', title: 'Lautstärke', 'aria-label': 'Lautstärke' }) as HTMLInputElement;
+  vol.addEventListener('input', () => setVolume(t, Number(vol.value)));
+  const messages = state?.quickMessages ?? [];
+  bar.dataset.key = JSON.stringify([messages, muted, single && t.id === audioTabId, !!state?.auth.loggedIn]);
+  bar.replaceChildren(
+    h('button', {
+      type: 'button', class: `qb-mute${muted ? ' is-muted' : ''}`,
+      title: single && t.id !== audioTabId ? 'Ton hierher holen (Strg+M)' : muted ? 'Ton einschalten (Strg+M)' : 'Stumm schalten (Strg+M)',
+      onclick: () => toggleMute(t),
+    }, icon(muted ? 'mute' : 'volume'), h('span', { text: muted ? 'Stumm' : 'Ton an' })),
+    vol,
+    h('span', { class: 'qb-sep' }),
+    h('div', { class: 'qb-msgs' },
+      ...messages.map((m) => {
+        const b = h('button', {
+          type: 'button', class: 'qb-msg', disabled: !state?.auth.loggedIn,
+          title: state?.auth.loggedIn ? `In den Chat: ${expandMessage(m.text, t)}` : 'Dafür bei Twitch anmelden',
+        }, h('span', { text: m.label })) as HTMLButtonElement;
+        b.addEventListener('click', () => void sendQuick(t, m, b));
+        return b;
+      }),
+      !messages.length ? h('span', { class: 'muted qb-empty', text: 'Noch keine Schnellnachrichten' }) : null),
+    iconButton('edit', 'Schnellnachrichten bearbeiten', () => openQuickDialog(), 'qb-edit'),
+  );
+}
+
+/** Leisten an Stumm-Zustand und geänderte Nachrichten anpassen (ohne den Regler beim Ziehen neu zu bauen). */
+function updateQuickbars(): void {
+  for (const t of tabs.values()) {
+    if (!t.qbar || !t.qbar.isConnected) continue;
+    const muted = t.ready && t.wv.isAudioMuted();
+    const key = JSON.stringify([state?.quickMessages ?? [], muted, singleAudio() && t.id === audioTabId, !!state?.auth.loggedIn]);
+    if (t.qbar.dataset.key !== key && !t.qbar.contains(document.activeElement)) fillQuickbar(t, t.qbar);
+  }
+}
+
+// ---------- Schnellnachrichten bearbeiten ----------
+
+let qmDraft: QuickMessage[] = [];
+
+function openQuickDialog(): void {
+  (document.getElementById('settings') as HTMLDialogElement).close();
+  qmDraft = (state?.quickMessages ?? []).map((m) => ({ ...m }));
+  renderQuickDialog();
+  (document.getElementById('qm-dialog') as HTMLDialogElement).showModal();
+}
+
+let qmSaveTimer = 0;
+function saveQuickDraft(): void {
+  clearTimeout(qmSaveTimer);
+  qmSaveTimer = window.setTimeout(async () => {
+    const saved = await api.setQuickMessages(qmDraft.filter((m) => m.text.trim()));
+    if (state) state.quickMessages = saved;
+    updateQuickbars();
+  }, 300);
+}
+
+function renderQuickDialog(focusIndex?: number, focusField?: 'label' | 'text'): void {
+  const list = document.getElementById('qm-list')!;
+  list.replaceChildren(...qmDraft.map((m, i) => {
+    const label = h('input', { class: 'qm-label', value: m.label, maxlength: '24', placeholder: 'Knopf', 'aria-label': 'Beschriftung' }) as HTMLInputElement;
+    const text = h('input', { class: 'qm-text', value: m.text, maxlength: '450', placeholder: 'Nachricht für den Chat, z. B. Hallo {kanal}!', 'aria-label': 'Nachricht' }) as HTMLInputElement;
+    label.addEventListener('input', () => { m.label = label.value; saveQuickDraft(); });
+    text.addEventListener('input', () => { m.text = text.value; if (!m.label.trim()) m.label = text.value.slice(0, 24); saveQuickDraft(); });
+    const row = h('div', { class: 'qm-row' },
+      h('span', { class: 'qm-num', text: String(i + 1) }),
+      label, text,
+      iconButton('up', 'Nach oben', () => { if (i > 0) { [qmDraft[i - 1], qmDraft[i]] = [qmDraft[i], qmDraft[i - 1]]; saveQuickDraft(); renderQuickDialog(); } }, i === 0 ? 'off' : ''),
+      iconButton('down', 'Nach unten', () => { if (i < qmDraft.length - 1) { [qmDraft[i + 1], qmDraft[i]] = [qmDraft[i], qmDraft[i + 1]]; saveQuickDraft(); renderQuickDialog(); } }, i === qmDraft.length - 1 ? 'off' : ''),
+      iconButton('trash', 'Entfernen', () => { qmDraft.splice(i, 1); saveQuickDraft(); renderQuickDialog(); }, 'danger'));
+    if (focusIndex === i) setTimeout(() => (focusField === 'text' ? text : label).focus(), 0);
+    return row;
+  }));
+  if (!qmDraft.length) list.append(h('p', { class: 'muted rule-hint', text: 'Noch keine Schnellnachrichten – unten hinzufügen.' }));
+  (document.getElementById('qm-add') as HTMLButtonElement).disabled = qmDraft.length >= 20;
+}
+
+function setupQuickDialog(): void {
+  document.getElementById('qm-add')!.addEventListener('click', () => {
+    qmDraft.push({ label: '', text: '' });
+    renderQuickDialog(qmDraft.length - 1, 'label');
+  });
+  document.getElementById('qm-reset')!.addEventListener('click', () => {
+    if (!confirm('Alle Schnellnachrichten auf die Beispiele zurücksetzen?')) return;
+    qmDraft = [
+      { label: '👋 Hallo', text: 'Hallo {kanal} 👋' },
+      { label: 'GG', text: 'GG! 🎉' },
+      { label: 'Lurk', text: '!lurk' },
+      { label: '❤️ Danke', text: 'Danke für den Stream, {kanal}! ❤️' },
+    ];
+    saveQuickDraft();
+    renderQuickDialog();
+  });
+  document.getElementById('btn-quick')!.addEventListener('click', openQuickDialog);
 }
 
 // ---------- Ton: nur ein Tab ----------
@@ -2771,6 +2931,7 @@ async function main(): Promise<void> {
   api.onRaid((r) => showRaid({ source: r.source, target: r.target, guessed: r.guessed, text: r.text, join: false, leave: false }));
   setInterval(() => void watchRaids(), 2500);
   setupRecording();
+  setupQuickDialog();
   void api.appVersion().then((v) => { APP_VERSION = v; });
   document.getElementById('rw-backdrop')!.addEventListener('click', () => closeRewardsDrawer());
   setupTabList();

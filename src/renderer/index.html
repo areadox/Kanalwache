@@ -69,6 +69,8 @@
       <label class="row"><input type="checkbox" data-setting="giveawayHelper"> Chat der Live-Kanäle mitlesen und Giveaways erkennen</label>
       <label class="row"><input type="checkbox" data-setting="giveawayNotify"> Benachrichtigen, wenn ein Giveaway startet</label>
       <div class="row"><button type="button" class="btn small" id="btn-rules">Erkennungswörter bearbeiten …</button></div>
+      <h3>Schnellleiste</h3>
+      <div class="row"><button type="button" class="btn small" id="btn-quick">Schnellnachrichten bearbeiten …</button></div>
       <h3>Aufnahmen</h3>
       <p class="muted rule-hint">Nur in Kanälen verfügbar, in denen du Mod bist – über den Knopf „Aufnehmen“ oben rechts im Stream-Tab.</p>
       <div class="row rec-dir-row"><span class="muted">Ordner:</span> <span id="rec-dir" class="rec-dir"></span>
@@ -132,6 +134,22 @@
         <span id="follows-count" class="muted"></span>
         <button value="cancel" class="btn">Abbrechen</button>
         <button type="button" class="btn primary" id="follows-import">Übernehmen</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="qm-dialog" class="wide">
+    <form method="dialog" class="settings">
+      <h2>Schnellnachrichten</h2>
+      <p class="muted rule-hint">Erscheinen als Knöpfe in der Leiste unter dem Player. Ein Klick schreibt die Nachricht mit deinem Account in den Chat des Kanals.
+        Platzhalter: <code>{kanal}</code> = Name des Kanals, <code>{ich}</code> = dein Name. Auch Befehle wie <code>!lurk</code> gehen.</p>
+      <div id="qm-list" class="qm-list"></div>
+      <div class="qm-actions">
+        <button type="button" class="btn small" id="qm-add">+ Nachricht hinzufügen</button>
+        <button type="button" class="link-btn" id="qm-reset">Beispiele wiederherstellen</button>
+      </div>
+      <div class="settings-actions">
+        <button value="close" class="btn primary">Fertig</button>
       </div>
     </form>
   </dialog>

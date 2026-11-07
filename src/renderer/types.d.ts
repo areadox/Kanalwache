@@ -40,6 +40,11 @@ interface AppSettings {
   followAutoOpen: boolean;
 }
 
+interface QuickMessage {
+  label: string;
+  text: string;
+}
+
 interface ChannelReward {
   id: string;
   title: string;
@@ -120,6 +125,7 @@ interface AppState {
   mods: string[];
   /** Favoriten in deiner Reihenfolge */
   starred: string[];
+  quickMessages: QuickMessage[];
   /** Dein eigener Kanal, wenn du mit diesem Account angemeldet bist */
   broadcaster: string | null;
 }
@@ -172,6 +178,9 @@ interface KanalwacheApi {
   onStopAllRecordings(cb: () => void): void;
   onShortcut(cb: (name: string) => void): void;
   copyText(text: string): Promise<void>;
+  setOpenChannels(list: string[]): Promise<void>;
+  chatSend(channel: string, text: string): Promise<Result>;
+  setQuickMessages(list: QuickMessage[]): Promise<QuickMessage[]>;
   raidNotify(source: string, target: string): Promise<void>;
   onRaid(cb: (r: { source: string; target: string; guessed: boolean; text: string }) => void): void;
   appVersion(): Promise<string>;
