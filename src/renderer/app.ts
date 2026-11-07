@@ -248,10 +248,8 @@ function buildTabContent(t: Tab): void {
     if (t.wv !== wv) return;
     t.ready = true;
     if (wantMuted(t)) wv.setAudioMuted(true);
-    // Gespeicherte Lautstärke übernehmen, sobald das Video da ist
-    if (t.kind === 'stream' && quickVolume < 100) {
-      void wv.executeJavaScript(`new Promise((done) => { let n = 0; const go = () => { const v = document.querySelector('video'); if (v) { v.volume = ${quickVolume / 100}; done(true); } else if (n++ < 40) setTimeout(go, 250); else done(false); }; go(); })`).catch(() => {});
-    }
+    // Gemeinsame Lautstärke gleich übernehmen (danach hält syncVolumes sie aktuell)
+    if (t.kind === 'stream') void wv.executeJavaScript(volSetJs(quickVolume)).catch(() => {});
     renderTabBar();
   };
   if (t.kind === 'stream' && t.login && isCompact(t)) {
@@ -661,11 +659,83 @@ function expandMessage(text: string, t: Tab): string {
     .replace(/\{ich\}/gi, state?.auth.user ?? '');
 }
 
-function setVolume(t: Tab, v: number): void {
+// ---------- Gemeinsame Lautstärke für alle Streams ----------
+
+/** Liest Lautstärke und Twitchs eigenen Stumm-Zustand im Player. known = Kanalwache hat dieses Video schon eingestellt. */
+const VOL_READ_JS = `(() => {
+  const v = document.querySelector('video');
+  if (!v) return null;
+  // user = du hast im Player gerade selbst geklickt, gescrollt oder eine Taste gedrückt
+  return { vol: Math.round(v.volume * 100), muted: v.muted, known: v.__kw === true, user: Date.now() - (window.__kwUserAt || 0) < 4000 };
+})()`;
+
+/** Setzt die Lautstärke im Player, hebt Twitchs eigenes Stummschalten auf (stumm schaltet Kanalwache selbst) und merkt sie für neue Player. */
+function volSetJs(vol: number): string {
+  return `(() => {
+    const v = document.querySelector('video');
+    if (!window.__kwHooked) {
+      window.__kwHooked = true;
+      const mark = () => { window.__kwUserAt = Date.now(); };
+      for (const ev of ['pointerdown', 'wheel', 'keydown']) window.addEventListener(ev, mark, true);
+    }
+    try { localStorage.setItem('volume', '${(vol / 100).toFixed(2)}'); localStorage.setItem('muted', 'false'); } catch (e) {}
+    if (!v) return false;
+    v.volume = ${vol / 100};
+    v.muted = false;
+    v.__kw = true;
+    return true;
+  })()`;
+}
+
+function setCentralVolume(v: number): void {
   quickVolume = Math.max(0, Math.min(100, Math.round(v)));
   try { localStorage.setItem('kw.volume', String(quickVolume)); } catch { /* egal */ }
-  if (!t.ready) return;
-  void t.wv.executeJavaScript(`(() => { const v = document.querySelector('video'); if (v) { v.volume = ${quickVolume / 100}; if (${quickVolume} > 0) v.muted = false; } })()`).catch(() => {});
+  for (const el of document.querySelectorAll<HTMLInputElement>('.qb-vol')) if (document.activeElement !== el) el.value = String(quickVolume);
+}
+
+function setVolume(_t: Tab, v: number): void {
+  setCentralVolume(v);
+  void syncVolumes();
+}
+
+let volSyncing = false;
+
+/**
+ * Hält die Lautstärke in allen Playern gleich. Änderungen an Twitchs eigenem Regler im aktiven Stream
+ * werden zur neuen gemeinsamen Lautstärke; Twitchs Stumm-Knopf schaltet wie Strg+M um.
+ */
+async function syncVolumes(): Promise<void> {
+  if (volSyncing) return;
+  volSyncing = true;
+  try {
+    const list = [...tabs.values()].filter((t) => t.kind === 'stream' && t.ready && t.mode === 'viewer');
+    // Aktiven Tab zuerst – von dort werden Änderungen übernommen
+    list.sort((a, b) => Number(b.id === activeId) - Number(a.id === activeId));
+    for (const t of list) {
+      type VolInfo = { vol: number; muted: boolean; known: boolean; user: boolean };
+      let r: VolInfo | null;
+      try {
+        r = (await t.wv.executeJavaScript(VOL_READ_JS)) as VolInfo | null;
+      } catch {
+        continue;
+      }
+      if (!r) continue;
+      if (t.id === activeId && r.known && r.user) {
+        if (r.muted) {
+          // Twitchs Stumm-Knopf im aktiven Player → zentral umschalten
+          toggleMute(t);
+        } else if (Math.abs(r.vol - quickVolume) > 1) {
+          // Twitchs Regler im aktiven Player bewegt → neue gemeinsame Lautstärke
+          setCentralVolume(r.vol);
+        }
+      }
+      if (!r.known || r.muted || Math.abs(r.vol - quickVolume) > 1) {
+        await t.wv.executeJavaScript(volSetJs(quickVolume)).catch(() => {});
+      }
+    }
+  } finally {
+    volSyncing = false;
+  }
 }
 
 async function sendQuick(t: Tab, m: QuickMessage, btn: HTMLButtonElement): Promise<void> {
@@ -2499,6 +2569,7 @@ async function main(): Promise<void> {
   setInterval(() => void watchRaids(), 2500);
   setupRecording();
   setupQuickDialog();
+  setInterval(() => void syncVolumes(), 1000);
   setupTabList();
   api.onToast(toast);
   setupFollowsDialog();

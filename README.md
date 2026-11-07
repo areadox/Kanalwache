@@ -89,7 +89,7 @@ Rechts in derselben Leiste stehen die Werkzeuge des aktiven Tabs (Zuschauer/Mod-
 Unter jedem Stream (in der Ansicht „nur Player und Chat“) liegt eine Leiste mit:
 
 - **Ton an / Stumm** – wie Strg+M; bei „Ton nur aus einem Tab“ holt der Knopf an einem stummen Tab den Ton hierher.
-- **Lautstärkeregler** – gilt für alle Streams und wird gemerkt.
+- **Lautstärkeregler** – eine gemeinsame Lautstärke für alle Streams, die gemerkt wird. Kanalwache hält sie in jedem Player gleich, auch wenn Twitch die Lautstärke nach Werbung oder beim Neuladen zurücksetzt. Bewegst du im aktiven Stream Twitchs eigenen Regler, wird das die neue gemeinsame Lautstärke; Twitchs Stumm-Knopf schaltet wie Strg+M um.
 - **Schnellnachrichten** – ein Klick schreibt die Nachricht mit deinem Account in den Chat des Kanals. Der Knopf wird kurz grün, wenn Twitch die Nachricht angenommen hat; lehnt Twitch ab (z. B. Follower-only, Slow-Mode, Timeout), steht der Grund in der Meldung.
 - **Stift** – Schnellnachrichten bearbeiten (auch unter Einstellungen → *Schnellleiste*): Beschriftung und Text, Reihenfolge, bis zu 20 Stück. Platzhalter: `{kanal}` = Name des Kanals, `{ich}` = dein Name. Befehle wie `!lurk` gehen, Twitch-Befehle mit `/` nicht.
 
