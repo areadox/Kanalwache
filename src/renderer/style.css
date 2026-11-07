@@ -663,17 +663,14 @@ main { position: relative; }
   flex: none;
 }
 
-/* ---------- Kanalpunkte-Belohnungen ---------- */
-.pts-btn {
+/* ---------- Kanalpunkte-Anzeige ---------- */
+.pts-display {
   display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; margin-right: 4px;
-  border: 1px solid rgba(180, 140, 255, .4); border-radius: 8px; background: rgba(180, 140, 255, .1);
-  color: var(--text); font-size: 12.5px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums;
+  border: 1px solid rgba(180, 140, 255, .3); border-radius: 8px; background: rgba(180, 140, 255, .08);
+  font-size: 12.5px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; cursor: default;
 }
-.pts-btn .ico { width: 15px; height: 15px; color: var(--accent); }
-.pts-btn:hover:not(:disabled) { background: rgba(180, 140, 255, .2); }
-.pts-btn:disabled { opacity: .45; cursor: default; }
-.pts-btn-label { font-weight: 600; color: #d9ccff; }
-@media (max-width: 1250px) { .pts-btn-label { display: none; } }
+.pts-display .ico { width: 15px; height: 15px; color: var(--accent); }
+.pts-display.empty { opacity: .45; }
 
 /* ---------- Giveaway-Gewinner ---------- */
 .gw-winners {
@@ -748,73 +745,10 @@ main { position: relative; }
 @media (max-width: 1600px) {
   .seg-btn > span:not(.ico) { display: none; }
   .seg-btn { padding: 0 8px; }
-  .pts-btn-label { display: none; }
   .rec-btn:not(.on) > span:last-child { display: none; }
   .rec-btn:not(.on) { padding: 0 9px; }
 }
 
-/* ---------- Belohnungsmenü von rechts ---------- */
-.rw-backdrop { position: absolute; inset: 0; z-index: 40; background: rgba(0, 0, 0, .35); }
-.rw-backdrop[hidden] { display: none; }
-.rw-drawer {
-  position: absolute; top: 0; right: 0; bottom: 0; z-index: 41; width: min(420px, 92%);
-  display: flex; flex-direction: column;
-  background: #17171d; border-left: 1px solid #34343f; box-shadow: -18px 0 50px rgba(0, 0, 0, .5);
-  transform: translateX(105%); transition: transform .22s ease; visibility: hidden;
-}
-.rw-drawer.open { transform: none; visibility: visible; }
-.rw-head { display: flex; align-items: center; gap: 10px; padding: 14px 12px 12px 16px; border-bottom: 1px solid var(--line); }
-.rw-title { display: flex; flex-direction: column; flex: 1; min-width: 0; }
-.rw-title strong { font-size: 15px; }
-.rw-balance { display: inline-flex; align-items: center; gap: 5px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.rw-balance .ico, .rw-pts-icon { width: 16px; height: 16px; color: var(--accent); }
-.rw-balance .muted { font-weight: 500; font-size: 12.5px; }
-.rw-body { flex: 1; overflow-y: auto; padding: 12px; }
-.rw-msg { margin: 18px 6px; line-height: 1.45; }
-.rw-done {
-  display: flex; align-items: center; gap: 8px; margin-bottom: 10px; padding: 8px 12px; border-radius: 8px;
-  background: rgba(61, 220, 151, .1); color: #bdf3da; font-weight: 600; font-size: 13px;
-}
-.rw-done .ico { width: 15px; height: 15px; color: var(--ok); }
-.rw-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
-.rw-card {
-  position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 8px 9px;
-  border: 1px solid var(--line); border-radius: 10px; background: var(--panel); text-align: center;
-}
-.rw-card:hover:not(:disabled) { border-color: #45455a; background: var(--panel-2); }
-.rw-card.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); background: rgba(180, 140, 255, .1); }
-.rw-card.dim { opacity: .45; }
-.rw-tile {
-  display: grid; place-items: center; width: 52px; height: 52px; border-radius: 10px; background: #2c2c38;
-}
-.rw-tile img { width: 36px; height: 36px; object-fit: contain; }
-.rw-tile .ico { width: 26px; height: 26px; color: #fff; }
-.rw-name {
-  font-size: 12.5px; font-weight: 600; line-height: 1.3; overflow: hidden;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; min-height: 2.6em;
-}
-.rw-cost { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; color: #d9ccff; font-variant-numeric: tabular-nums; }
-.rw-cost .ico { width: 13px; height: 13px; color: var(--accent); }
-.rw-flag {
-  position: absolute; top: 6px; right: 6px; padding: 1px 6px; border-radius: 4px;
-  background: rgba(255, 255, 255, .1); color: var(--muted); font-size: 10px; font-weight: 700;
-}
-.rw-flag.text { background: rgba(180, 140, 255, .18); color: #d9ccff; }
-.rw-detail {
-  display: flex; flex-direction: column; gap: 8px; padding: 12px 14px;
-  border-top: 1px solid var(--line); background: #1c1c24;
-}
-.rw-detail p { margin: 0; font-size: 12.5px; line-height: 1.4; white-space: pre-wrap; max-height: 90px; overflow-y: auto; }
-.rw-detail textarea {
-  resize: vertical; min-height: 60px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px;
-  background: var(--bg); outline: none; font: inherit;
-}
-.rw-detail textarea:focus { border-color: var(--accent); }
-.rw-detail-actions { display: flex; justify-content: flex-end; gap: 8px; }
-.rw-go { display: inline-flex; align-items: center; gap: 6px; }
-.rw-go .ico { width: 15px; height: 15px; }
-.rw-foot { padding: 8px 16px 12px; border-top: 1px solid var(--line); }
-.pts-btn.on { background: rgba(180, 140, 255, .28); border-color: var(--accent); }
 
 /* ---------- Raid-Karten ---------- */
 .raid-stack {

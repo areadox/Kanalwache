@@ -15,7 +15,7 @@ Ein eigener Twitch-Viewer für Windows: dein Kanal und deine Lieblingskanäle an
 - Läuft im **Infobereich** weiter, wenn das Fenster geschlossen wird; Tray-Menü zeigt, wer gerade live ist
 - Optional **Autostart mit Windows** (startet versteckt im Infobereich)
 - **Giveaway-Helfer**: erkennt Giveaways in deinen Lieblingskanälen und lässt dich mit einem Klick teilnehmen, mit selbst festlegbaren Erkennungswörtern (siehe unten)
-- **Kanalpunkte**: holt den Bonus in offenen Streams automatisch ab, zeigt den Kontostand und blendet mit einem Klick ein Belohnungsmenü von rechts ein (siehe unten)
+- **Kanalpunkte**: holt den Bonus in offenen Streams automatisch ab und zeigt den Kontostand (siehe unten)
 - **Favoriten** ★ in einer eigenen Leiste unter den Tabs, mit Alt+1–9 und Alt+←/→ schnell durchschalten (siehe unten)
 - **Gefolgte Kanäle übernehmen**: alle Kanäle, denen du folgst, mit einem Klick in die Liste – auf Wunsch laufend abgeglichen (siehe unten)
 - **Aufnahme**: Streams als Video aufnehmen – nur in Kanälen, in denen du Mod bist (siehe unten)
@@ -65,16 +65,9 @@ In jedem offenen Stream-Tab schaut Kanalwache alle 15 Sekunden nach, ob der Bonu
 - Abschaltbar in den Einstellungen unter *Kanalpunkte*.
 - Twitch erlaubt automatisches Abholen nicht ausdrücklich; Browser-Erweiterungen machen dasselbe seit Jahren. Nutzung auf eigene Verantwortung.
 
-### Belohnungen einlösen
+### Kontostand und Belohnungen
 
-Ein Klick auf den Kanalpunkte-Knopf **🪙 Kontostand** rechts in der zweiten Leiste (oder **Strg+Umschalt+P**, oder Rechtsklick auf den Tab → *Kanalpunkte-Belohnungen*) blendet von rechts das **Belohnungsmenü** ein:
-
-- Oben Kanal und dein Kontostand, darunter alle Belohnungen des Kanals als Kacheln – mit Bild, Farbe und Preis, die günstigsten zuerst.
-- Belohnungen, die du dir gerade nicht leisten kannst oder die pausiert bzw. ausverkauft sind, sind ausgegraut.
-- Klick auf eine Belohnung → unten erscheint die Beschreibung und **„Für 500 einlösen“**. Verlangt die Belohnung einen Text, gibst du ihn dort ein.
-- Eingelöst wird über Twitchs eigenes Belohnungsmenü im Chat (dort laufen Twitchs Prüfungen) – Kanalwache klickt das für dich, auch wenn der Chat ausgeblendet ist. Klappt das einmal nicht, bleibt Twitchs Menü im eingeblendeten Chat offen, und du löst dort direkt ein. Die Meldung dazu hat den Knopf **Fehlerbericht kopieren**: Er kopiert, was Twitchs Menü in dem Moment angezeigt hat – damit lässt sich die Erkennung gezielt anpassen.
-- Schließen mit **Esc**, Klick daneben oder ×. Wechselst du den Tab, zeigt das Menü die Belohnungen des neuen Kanals.
-- Ganz unten: *Twitchs Menü im Chat öffnen* – für alles, was Twitch zusätzlich anbietet (z. B. Emote freischalten, hervorgehobene Nachricht).
+Rechts in der zweiten Leiste steht dein **Kanalpunkte-Kontostand** im aktiven Kanal (🪙), ebenso im Tab. Belohnungen löst du über Twitchs eigenen Kanalpunkte-Knopf im Chat ein.
 
 ## Favoriten
 
@@ -89,7 +82,7 @@ Alle Favoriten stehen in der **Favoritenleiste** – der zweiten Leiste direkt u
 - Vorne steht, wie viele Favoriten gerade live sind.
 - Ausblenden lässt sich die Leiste in den Einstellungen (*Favoritenleiste unter den Tabs anzeigen*).
 
-Rechts in derselben Leiste stehen die Werkzeuge des aktiven Tabs (Zuschauer/Mod-Ansicht, Kanalpunkte-Belohnungen, Chat ein/aus, Aufnehmen, neu laden, im Browser öffnen) – so bleibt die Tab-Leiste oben ganz für die Tabs frei. Bei schmalerem Fenster werden sie zu Symbolen.
+Rechts in derselben Leiste stehen die Werkzeuge des aktiven Tabs (Zuschauer/Mod-Ansicht, Kanalpunkte-Kontostand, Chat ein/aus, Aufnehmen, neu laden, im Browser öffnen) – so bleibt die Tab-Leiste oben ganz für die Tabs frei. Bei schmalerem Fenster werden sie zu Symbolen.
 
 ## Schnellleiste unter dem Player
 
@@ -137,7 +130,6 @@ Es ist immer nur **ein** Stream zu hören – der, den du gerade ansiehst. Alle 
 | Alt+→ / Alt+← | nächster / vorheriger Favorit (live oder offen) |
 | Strg+D | aktiven Stream zum Favoriten machen / entfernen |
 | Strg+Umschalt+R | Aufnahme starten / beenden (nur Mod-Kanäle) |
-| Strg+Umschalt+P | Belohnungsmenü ein-/ausblenden |
 
 Die Kürzel funktionieren auch, wenn gerade der Player oder Chat angeklickt ist.
 
@@ -249,7 +241,7 @@ Aufbau:
 | Datei | Inhalt |
 |---|---|
 | `src/main.ts` | Hauptprozess: Fenster, Tray, Abfrage-Schleife, Benachrichtigungen, Login-Erkennung |
-| `src/twitch.ts` | Live-Status, Mod-Status, gefolgte Kanäle und Kanalpunkte-Belohnungen abfragen |
+| `src/twitch.ts` | Live-Status, Mod-Status und gefolgte Kanäle abfragen |
 | `src/chat.ts` | Twitch-Chat (IRC über WebSocket): mitlesen, schreiben, Rückmeldungen |
 | `src/giveaway.ts` | Giveaway-Erkennung (Start, Teilnehmer, Ende, Gewinner) |
 | `src/raid.ts` | Raid-Ansagen im Chat erkennen |

@@ -1,9 +1,9 @@
-import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeImage, nativeTheme, Notification, session, shell, Tray, webContents } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, Notification, session, shell, Tray, webContents } from 'electron';
 import { RecordingFiles } from './recorder';
 import { extractRaidTarget } from './raid';
 import * as path from 'node:path';
 import { clampPoll, normalizeLogin, sanitizeQuickMessages, Settings, Store } from './store';
-import { ChannelRewards, ChannelStatus, fetchFollows, fetchModChannels, fetchRewards, fetchStatuses, FollowedChannel } from './twitch';
+import { ChannelStatus, fetchFollows, fetchModChannels, fetchStatuses, FollowedChannel } from './twitch';
 import { TwitchChat } from './chat';
 import { analyzeAnnouncement, ENTRY_RE, Giveaway, GiveawayDetector } from './giveaway';
 import { compileRules, CompiledRules, DEFAULT_RULES, sanitizeRules } from './rules';
@@ -510,7 +510,6 @@ function shortcutFor(input: Electron.Input): string | null {
     if (c === 'KeyT') return 'reopen';
     if (c === 'KeyA') return 'tablist';
     if (c === 'KeyR') return 'record';
-    if (c === 'KeyP') return 'rewards';
     return null;
   }
   const digit = c.match(/^(?:Digit|Numpad)([1-9])$/);
@@ -751,22 +750,6 @@ function registerIpc(): void {
     return { ok: true };
   });
 
-  const rewardsCache = new Map<string, { at: number; data: ChannelRewards }>();
-  ipcMain.handle('get-rewards', async (_e, login: unknown, force: unknown) => {
-    const l = typeof login === 'string' ? normalizeLogin(login) : null;
-    if (!l) return { ok: false, error: 'Ungültiger Kanal.' };
-    if (!authToken) return { ok: false, error: 'Dafür musst du bei Twitch angemeldet sein.' };
-    const hit = rewardsCache.get(l);
-    if (!force && hit && Date.now() - hit.at < 60_000) return { ok: true, ...hit.data };
-    try {
-      const data = await fetchRewards(l, authToken);
-      rewardsCache.set(l, { at: Date.now(), data });
-      return { ok: true, ...data };
-    } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : String(err) };
-    }
-  });
-
   ipcMain.handle('get-follows', async (_e, force: unknown) => {
     try {
       const list = await loadFollows(force === true);
@@ -992,12 +975,6 @@ function registerIpc(): void {
     saveAndPush(false);
     return store.config.quickMessages;
   });
-
-  ipcMain.handle('copy-text', (_e, text: unknown) => {
-    if (typeof text === 'string') clipboard.writeText(text.slice(0, 20000));
-  });
-
-  ipcMain.handle('app-version', () => app.getVersion());
 
   ipcMain.handle('open-external', (_e, url: unknown) => {
     if (typeof url === 'string' && /^https:\/\//i.test(url)) void shell.openExternal(url);
