@@ -938,7 +938,7 @@ function registerIpc(): void {
     if (!patch || typeof patch !== 'object') return;
     const p = patch as Partial<Settings>;
     const s = store.config.settings;
-    for (const key of ['closeToTray', 'startInTray', 'autostart', 'muteAutoOpened', 'closeTabWhenOffline', 'giveawayHelper', 'giveawayNotify', 'autoClaimPoints', 'syncFollows', 'followNotify', 'followAutoOpen', 'fullPage', 'singleAudio', 'showFavBar', 'raidPrompt', 'autoUpdate', 'twitchNotifs', 'twitchNotifPopup'] as const) {
+    for (const key of ['closeToTray', 'startInTray', 'autostart', 'muteAutoOpened', 'closeTabWhenOffline', 'giveawayHelper', 'giveawayNotify', 'autoClaimPoints', 'syncFollows', 'followNotify', 'followAutoOpen', 'fullPage', 'singleAudio', 'showFavBar', 'raidPrompt', 'autoUpdate', 'twitchNotifs', 'twitchNotifPopup', 'dropsCheck', 'autoClaimDrops', 'dropsNotify'] as const) {
       if (typeof p[key] === 'boolean') s[key] = p[key] as boolean;
     }
     if (typeof p.pollSeconds === 'number') s.pollSeconds = clampPoll(p.pollSeconds);
@@ -1080,6 +1080,16 @@ function registerIpc(): void {
     store.config.quickMessages = sanitizeQuickMessages(list);
     saveAndPush(false);
     return store.config.quickMessages;
+  });
+
+  ipcMain.handle('drops-notify', (_e, title: unknown, body: unknown) => {
+    if (typeof title !== 'string' || typeof body !== 'string' || !store.config.settings.dropsNotify || !Notification.isSupported()) return;
+    const n = new Notification({ title: title.slice(0, 120), body: body.slice(0, 300), icon: iconPath() });
+    n.on('click', () => {
+      showWindow();
+      win?.webContents.send('shortcut', 'drops');
+    });
+    n.show();
   });
 
   ipcMain.handle('notifs-refresh', () => refreshNotifs());

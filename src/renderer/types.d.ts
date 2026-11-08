@@ -41,6 +41,9 @@ interface AppSettings {
   followAutoOpen: boolean;
   twitchNotifs: boolean;
   twitchNotifPopup: boolean;
+  dropsCheck: boolean;
+  autoClaimDrops: boolean;
+  dropsNotify: boolean;
 }
 
 interface QuickMessage {
@@ -171,6 +174,7 @@ interface KanalwacheApi {
   logout(): Promise<void>;
   openExternal(url: string): Promise<void>;
   notifsRefresh(): Promise<void>;
+  dropsNotify(title: string, body: string): Promise<void>;
   notifsSeen(): Promise<void>;
   notifsOpen(id: string): Promise<void>;
   onShowGiveaways(cb: () => void): void;

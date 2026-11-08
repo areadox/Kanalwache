@@ -48,6 +48,10 @@ export interface Settings {
   /** Twitch-Benachrichtigungen (Glocke) abholen und neue auch als Windows-Meldung zeigen */
   twitchNotifs: boolean;
   twitchNotifPopup: boolean;
+  /** Drops: Inventar regelmäßig prüfen, fertige Drops automatisch abholen, Meldung dazu */
+  dropsCheck: boolean;
+  autoClaimDrops: boolean;
+  dropsNotify: boolean;
 }
 
 export interface QuickMessage {
@@ -116,6 +120,9 @@ export const DEFAULT_SETTINGS: Settings = {
   followAutoOpen: false,
   twitchNotifs: true,
   twitchNotifPopup: false,
+  dropsCheck: true,
+  autoClaimDrops: true,
+  dropsNotify: true,
 };
 
 const LOGIN_RE = /^[a-z0-9_]{2,25}$/;

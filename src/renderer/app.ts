@@ -433,7 +433,9 @@ function closeTab(id: string, batch = false, recStopped = false): void {
   } else renderTabBar();
 }
 
-const FIXED_VIEWS = ['home', 'giveaways'];
+const FIXED_VIEWS = ['home', 'giveaways', 'drops'];
+/** Feste Seiten, die beim Durchschalten (Strg+Tab, Strg+1–9) mitzählen */
+const NAV_VIEWS = ['home', 'giveaways'];
 
 function activate(id: string): void {
   activeId = tabs.has(id) || FIXED_VIEWS.includes(id) ? id : 'home';
@@ -449,7 +451,7 @@ function activate(id: string): void {
 
 /** Reihenfolge aller Tabs: erst die festen, dann die offenen Streams */
 function tabSequence(): string[] {
-  return [...FIXED_VIEWS, ...tabs.keys()];
+  return [...NAV_VIEWS, ...tabs.keys()];
 }
 
 function tabLabel(t: Tab): string {
@@ -589,6 +591,11 @@ function renderTabBar(): void {
     h('button', { class: `tab home-tab${activeId === 'giveaways' ? ' active' : ''}`, type: 'button', title: 'Giveaways (Strg+2)', onclick: () => activate('giveaways') },
       icon('gift'), h('span', { text: 'Giveaways' }),
       openGiveaways().length ? h('span', { class: 'pill', text: String(openGiveaways().length) }) : null),
+    state?.auth.loggedIn && state.settings.dropsCheck
+      ? h('button', { class: `tab home-tab${activeId === 'drops' ? ' active' : ''}`, type: 'button', title: 'Drops – Fortschritt und abholen', onclick: () => activate('drops') },
+          icon('trophy'), h('span', { text: 'Drops' }),
+          drops.ready ? h('span', { class: 'pill', text: String(drops.ready) }) : null)
+      : null,
   );
 
   const scroller = h('div', { class: 'tabs-scroll', role: 'tablist' }, ...[...tabs.values()].map(tabButton));
@@ -1615,6 +1622,7 @@ function handleShortcut(name: string): void {
   const cur = Math.max(0, seq.indexOf(activeId));
   const active = tabs.get(activeId);
   if (name === 'notifs') { toggleNotifs(true); return; }
+  if (name === 'drops') { activate('drops'); return; }
   if (name === 'notifs-toggle') { if (state?.auth.loggedIn && state.settings.twitchNotifs) toggleNotifs(); return; }
   if (name === 'next') activate(seq[(cur + 1) % seq.length]);
   else if (name === 'prev') activate(seq[(cur - 1 + seq.length) % seq.length]);
@@ -2275,6 +2283,144 @@ function setupFollowsDialog(): void {
 
 // ---------- Einstellungen ----------
 
+// ---------- Drops ----------
+
+/** Läuft in der Inventar-Seite von Twitch: findet „Abholen“-Knöpfe und klickt sie auf Wunsch. */
+function dropsScanJs(click: boolean): string {
+  return `(() => {
+  const RE = /^(jetzt\\s+)?(abholen|einfordern|einlösen)$|^claim(\\s+now)?$/i;
+  const btns = Array.from(document.querySelectorAll('button')).filter((b) => {
+    const t = (b.innerText || b.textContent || '').trim();
+    return RE.test(t) && !b.disabled && b.getClientRects().length > 0;
+  });
+  const names = btns.map((b) => {
+    let el = b;
+    for (let i = 0; i < 6 && el.parentElement; i++) {
+      el = el.parentElement;
+      const lines = (el.innerText || '').split('\\n').map((s) => s.trim()).filter((s) => s && !RE.test(s) && !/^\\d+\\s*%$/.test(s));
+      if (lines.length) return lines[0].slice(0, 80);
+    }
+    return 'Drop';
+  });
+  if (${click}) btns.forEach((b) => b.click());
+  const loggedOut = !!document.querySelector('[data-a-target="login-button"]');
+  return { count: btns.length, names, clicked: ${click} ? btns.length : 0, loggedOut };
+})()`;
+}
+
+const DROPS_URL = 'https://www.twitch.tv/drops/inventory';
+let dropsWv: WebviewEl | null = null;
+let dropsReady = false;
+let dropsLoadedAt = 0;
+let dropsTimer: number | null = null;
+const drops = { ready: 0, names: [] as string[], checkedAt: 0, loggedOut: false };
+/** Schon gemeldete bereite Drops (Name) – damit nicht jede Minute neu gemeldet wird */
+const dropsAnnounced = new Set<string>();
+
+function dropsEnabled(): boolean {
+  return !!state?.auth.loggedIn && !!state.settings.dropsCheck;
+}
+
+function syncDrops(): void {
+  const stage = document.getElementById('drops-stage');
+  if (!stage) return;
+  (document.getElementById('drops-auto') as HTMLInputElement).checked = !!state?.settings.autoClaimDrops;
+  if (dropsEnabled() && !dropsWv) {
+    dropsReady = false;
+    dropsWv = createWebview(DROPS_URL, () => { /* erster Scan über den Takt */ });
+    dropsWv.addEventListener('dom-ready', () => {
+      dropsReady = true;
+      dropsLoadedAt = Date.now();
+      // Seite braucht einen Moment, bis das Inventar gezeichnet ist
+      setTimeout(() => void scanDrops(), 6000);
+    });
+    stage.replaceChildren(dropsWv);
+    if (dropsTimer == null) dropsTimer = window.setInterval(() => void scanDrops(), 60_000);
+  } else if (!dropsEnabled() && dropsWv) {
+    dropsWv.remove();
+    dropsWv = null;
+    dropsReady = false;
+    drops.ready = 0;
+    if (dropsTimer != null) { clearInterval(dropsTimer); dropsTimer = null; }
+    if (activeId === 'drops') activate('home');
+  }
+  renderDropsBar();
+}
+
+function renderDropsBar(): void {
+  const st = document.getElementById('drops-status');
+  if (!st) return;
+  st.textContent = !dropsEnabled()
+    ? (state?.auth.loggedIn ? 'Prüfung ist in den Einstellungen ausgeschaltet.' : 'Bitte bei Twitch anmelden.')
+    : drops.loggedOut
+      ? 'Nicht angemeldet – Seite neu laden.'
+      : drops.ready
+        ? `${drops.ready} bereit zum Abholen: ${drops.names.join(', ')}`
+        : drops.checkedAt ? `Nichts abzuholen · geprüft ${ago(drops.checkedAt)}` : 'Inventar wird geladen …';
+}
+
+let dropsScanning = false;
+
+async function scanDrops(): Promise<void> {
+  if (!dropsWv || !dropsReady || dropsScanning || !state) return;
+  // Alle 10 Minuten neu laden (Fortschritt aktualisiert sich nicht von selbst) – nicht, während du es dir ansiehst
+  if (Date.now() - dropsLoadedAt > 10 * 60_000 && activeId !== 'drops') {
+    dropsReady = false;
+    dropsWv.loadURL(DROPS_URL).catch(() => {});
+    return;
+  }
+  dropsScanning = true;
+  try {
+    const auto = !!state.settings.autoClaimDrops;
+    const r = (await dropsWv.executeJavaScript(dropsScanJs(auto))) as { count: number; names: string[]; clicked: number; loggedOut: boolean } | null;
+    if (!r) return;
+    drops.checkedAt = Date.now();
+    drops.loggedOut = r.loggedOut;
+    if (r.clicked) {
+      const list = r.names.join(', ');
+      toast(`Drop abgeholt: ${list}`);
+      void api.dropsNotify('Drop abgeholt', list);
+      drops.ready = 0;
+      drops.names = [];
+      for (const n of r.names) dropsAnnounced.delete(n);
+      // Kurz danach nachsehen, ob es geklappt hat (Knopf weg)
+      setTimeout(() => void scanDrops(), 5000);
+    } else {
+      drops.ready = r.count;
+      drops.names = r.names;
+      const fresh = r.names.filter((n) => !dropsAnnounced.has(n));
+      for (const n of fresh) dropsAnnounced.add(n);
+      for (const n of [...dropsAnnounced]) if (!r.names.includes(n)) dropsAnnounced.delete(n);
+      if (fresh.length) {
+        toast(`Drop bereit: ${fresh.join(', ')}`, { label: 'Anzeigen', run: () => activate('drops') });
+        void api.dropsNotify('Drop bereit zum Abholen', fresh.join(', '));
+      }
+    }
+  } catch {
+    /* Seite lädt gerade */
+  } finally {
+    dropsScanning = false;
+    renderDropsBar();
+    renderTabBar();
+  }
+}
+
+function setupDrops(): void {
+  document.getElementById('drops-reload')!.replaceChildren(icon('refresh'));
+  document.getElementById('drops-web')!.replaceChildren(icon('external'));
+  document.getElementById('drops-reload')!.addEventListener('click', () => {
+    if (!dropsWv) return;
+    dropsReady = false;
+    dropsWv.loadURL(DROPS_URL).catch(() => {});
+  });
+  document.getElementById('drops-web')!.addEventListener('click', () => void api.openExternal(DROPS_URL));
+  document.getElementById('drops-auto')!.addEventListener('change', (e) => {
+    const on = (e.target as HTMLInputElement).checked;
+    void api.updateSettings({ autoClaimDrops: on });
+    if (on) setTimeout(() => void scanDrops(), 500);
+  });
+}
+
 // ---------- Kanalpunkte ----------
 
 /** Läuft in der Twitch-Seite: liest den Kontostand und klickt den Bonus, falls er da ist. */
@@ -2770,6 +2916,7 @@ function applyState(next: AppState): void {
   renderTabBar();
   renderNotifs();
   if (notifOpen && !next.auth.loggedIn) toggleNotifs(false);
+  syncDrops();
 }
 
 async function main(): Promise<void> {
@@ -2801,6 +2948,7 @@ async function main(): Promise<void> {
   setInterval(() => void syncVolumes(), 1000);
   setupTabList();
   setupNotifs();
+  setupDrops();
   api.onToast(toast);
   setupFollowsDialog();
   document.getElementById('fav-filter')!.addEventListener('input', () => renderSidebar());

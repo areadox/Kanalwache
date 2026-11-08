@@ -931,3 +931,15 @@ main { position: relative; }
 .np-error { margin: 6px 8px 8px; padding: 8px 10px; border-radius: 8px; background: rgba(255, 179, 71, .1); color: #ffd9a6; font-size: 12.5px; }
 .notif-count { background: var(--live); color: #fff; }
 #np-web { white-space: nowrap; flex: none; }
+
+/* ---------- Drops ---------- */
+.drops-view { display: flex; flex-direction: column; }
+.drops-bar {
+  display: flex; align-items: center; gap: 12px; padding: 8px 14px; flex: none;
+  background: #121217; border-bottom: 1px solid var(--line);
+}
+.drops-bar strong { font-size: 14px; }
+#drops-status { flex: 1; min-width: 0; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.drops-auto { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; white-space: nowrap; }
+.drops-stage { flex: 1; min-height: 0; display: flex; }
+.drops-stage webview { flex: 1; }

@@ -22,6 +22,7 @@ Ein eigener Twitch-Viewer für Windows: dein Kanal und deine Lieblingskanäle an
 - **Gefolgte Kanäle übernehmen**: alle Kanäle, denen du folgst, mit einem Klick in die Liste – auf Wunsch laufend abgeglichen (siehe unten)
 - **Aufnahme**: Streams als Video aufnehmen – nur in Kanälen, in denen du Mod bist (siehe unten)
 - **Raids**: Raidet ein Kanal am Streamende, fragt Kanalwache mit einer Karte nach: mitraiden oder nicht (siehe unten)
+- **Drops**: zeigt dein Drop-Inventar, meldet fertige Drops und holt sie auf Wunsch automatisch ab (siehe unten)
 - **Twitch-Benachrichtigungen**: die Meldungen aus Twitchs Glocke direkt in Kanalwache (siehe unten)
 - **Moderation**: erkennt, wo du Mod bist, und öffnet dort mit einem Klick Twitchs Mod-Ansicht – für deinen eigenen Kanal den Stream-Manager (siehe unten)
 
@@ -86,6 +87,15 @@ Alle Favoriten stehen in der **Favoritenleiste** – der zweiten Leiste direkt u
 - Ausblenden lässt sich die Leiste in den Einstellungen (*Favoritenleiste unter den Tabs anzeigen*).
 
 Rechts in derselben Leiste stehen die Werkzeuge des aktiven Tabs (Zuschauer/Mod-Ansicht, Kanalpunkte-Kontostand, Chat ein/aus, Aufnehmen, neu laden, im Browser öffnen) – so bleibt die Tab-Leiste oben ganz für die Tabs frei. Bei schmalerem Fenster werden sie zu Symbolen.
+
+## Drops
+
+Nach der Anmeldung gibt es oben neben *Giveaways* den Tab **Drops**. Er zeigt Twitchs Drop-Inventar (twitch.tv/drops/inventory) mit dem Fortschritt deiner laufenden Kampagnen.
+
+- Kanalwache prüft das Inventar im Hintergrund jede Minute (und lädt es alle 10 Minuten neu). Ist ein Drop fertig, steht die Zahl am Tab, oben in der Leiste steht, welcher es ist, und es kommt eine Meldung.
+- **Automatisch abholen** (Standard: an) klickt fertige Drops selbst ab – danach kommt „Drop abgeholt: …“. Ausgeschaltet holst du sie im Tab mit einem Klick auf Twitchs **Abholen**-Knopf.
+- Fortschritt sammelst du wie auf Twitch: Stream eines Kanals mit aktiven Drops in Kanalwache schauen (angemeldet, Player läuft). Ob ein Spiel/Kampagne mit dem Konto verknüpft sein muss, siehst du im Inventar.
+- Einstellungen → *Drops*: Prüfung, automatisches Abholen und Windows-Meldungen einzeln abschaltbar.
 
 ## Twitch-Benachrichtigungen
 

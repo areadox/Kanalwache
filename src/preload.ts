@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('kanalwache', {
   logout: () => ipcRenderer.invoke('logout'),
   openExternal: (url: string) => ipcRenderer.invoke('open-external', url),
   notifsRefresh: () => ipcRenderer.invoke('notifs-refresh'),
+  dropsNotify: (title: string, body: string) => ipcRenderer.invoke('drops-notify', title, body),
   notifsSeen: () => ipcRenderer.invoke('notifs-seen'),
   notifsOpen: (id: string) => ipcRenderer.invoke('notifs-open', id),
   onShowGiveaways: (cb: () => void) => ipcRenderer.on('show-giveaways', () => cb()),
