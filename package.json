@@ -1,7 +1,7 @@
 {
   "name": "kanalwache",
   "productName": "Kanalwache",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "description": "Eigener Twitch-Viewer: dein Kanal und deine Lieblingskanäle an einem Ort, mit automatischem Zuschauen, sobald jemand live geht.",
   "author": "areadox",
   "license": "GPL-3.0-or-later",
