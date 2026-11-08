@@ -910,3 +910,24 @@ main { position: relative; }
   .qb-vol { width: 64px; }
   .qb-msg { max-width: 130px; padding: 0 10px; }
 }
+
+/* ---------- Twitch-Benachrichtigungen ---------- */
+.notif-panel { width: min(420px, calc(100% - 20px)); }
+.np-head { display: flex; align-items: center; gap: 10px; padding: 10px 10px 8px 14px; border-bottom: 1px solid var(--line); }
+.np-head strong { font-size: 13.5px; }
+.np-head .muted { flex: 1; font-size: 12px; }
+.np-items { padding-top: 6px; }
+.np-row { position: relative; display: flex; align-items: flex-start; gap: 10px; padding: 8px; border-radius: 8px; }
+.np-row.clickable { cursor: pointer; }
+.np-row.clickable:hover { background: rgba(255, 255, 255, .06); }
+.np-row.is-new { background: rgba(180, 140, 255, .08); }
+.np-thumb { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex: none; background: #2b2b35; }
+.np-thumb-empty { display: inline-grid; place-items: center; color: var(--muted); }
+.np-thumb-empty .ico { width: 16px; height: 16px; }
+.np-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.np-body { font-size: 13px; line-height: 1.35; overflow-wrap: anywhere; }
+.np-time { font-size: 11.5px; }
+.np-dot { width: 8px; height: 8px; margin-top: 6px; border-radius: 50%; background: var(--accent); flex: none; }
+.np-error { margin: 6px 8px 8px; padding: 8px 10px; border-radius: 8px; background: rgba(255, 179, 71, .1); color: #ffd9a6; font-size: 12.5px; }
+.notif-count { background: var(--live); color: #fff; }
+#np-web { white-space: nowrap; flex: none; }

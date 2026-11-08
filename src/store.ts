@@ -45,6 +45,9 @@ export interface Settings {
   /** Standard für Kanäle aus dem Follow-Abgleich */
   followNotify: boolean;
   followAutoOpen: boolean;
+  /** Twitch-Benachrichtigungen (Glocke) abholen und neue auch als Windows-Meldung zeigen */
+  twitchNotifs: boolean;
+  twitchNotifPopup: boolean;
 }
 
 export interface QuickMessage {
@@ -87,6 +90,8 @@ export interface Config {
   starred: string[];
   /** Schnellnachrichten für die Leiste unter dem Player */
   quickMessages: QuickMessage[];
+  /** Bis wann die Twitch-Benachrichtigungen angesehen wurden (ms) – neuere zählen als ungelesen */
+  notifSeenAt: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -109,6 +114,8 @@ export const DEFAULT_SETTINGS: Settings = {
   recordQuality: 'high',
   followNotify: true,
   followAutoOpen: false,
+  twitchNotifs: true,
+  twitchNotifPopup: false,
 };
 
 const LOGIN_RE = /^[a-z0-9_]{2,25}$/;
@@ -175,6 +182,7 @@ export class Store {
       starred: Array.isArray(raw.starred)
         ? [...new Set((raw.starred as unknown[]).map((x) => (typeof x === 'string' ? normalizeLogin(x) : null)).filter((x): x is string => !!x))]
         : [],
+      notifSeenAt: typeof raw.notifSeenAt === 'number' && Number.isFinite(raw.notifSeenAt) ? raw.notifSeenAt : 0,
       ignoredFollows: Array.isArray(raw.ignoredFollows)
         ? [...new Set((raw.ignoredFollows as unknown[]).map((x) => (typeof x === 'string' ? normalizeLogin(x) : null)).filter((x): x is string => !!x))]
         : [],

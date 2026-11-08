@@ -5,6 +5,7 @@ import { Updater } from './updater';
 import * as path from 'node:path';
 import { clampPoll, normalizeLogin, sanitizeQuickMessages, Settings, Store } from './store';
 import { ChannelStatus, fetchFollows, fetchModChannels, fetchStatuses, FollowedChannel } from './twitch';
+import { fetchTwitchNotifications, TwitchNotification } from './notifications';
 import { TwitchChat } from './chat';
 import { analyzeAnnouncement, ENTRY_RE, Giveaway, GiveawayDetector } from './giveaway';
 import { compileRules, CompiledRules, DEFAULT_RULES, sanitizeRules } from './rules';
@@ -116,6 +117,77 @@ function modChannels(): string[] {
 function ownBroadcasterLogin(): string | null {
   const own = store?.config.own?.login;
   return own && auth.user?.toLowerCase() === own ? own : null;
+}
+
+// ---------- Twitch-Benachrichtigungen (Glocke) ----------
+
+let notifs: { list: TwitchNotification[]; error: string | null; loading: boolean; at: number | null } = { list: [], error: null, loading: false, at: null };
+let notifTimer: NodeJS.Timeout | null = null;
+/** IDs, die beim letzten Abruf schon da waren – nur wirklich neue gehen als Windows-Meldung raus */
+let notifKnown: Set<string> | null = null;
+const NOTIF_EVERY = 2 * 60_000;
+
+function notifUnread(): number {
+  const seen = store.config.notifSeenAt;
+  return notifs.list.filter((n) => !n.read && (n.at == null ? false : n.at > seen)).length;
+}
+
+function scheduleNotifs(delay = NOTIF_EVERY): void {
+  if (notifTimer) clearTimeout(notifTimer);
+  notifTimer = setTimeout(() => void refreshNotifs(), delay);
+}
+
+async function refreshNotifs(): Promise<void> {
+  if (notifTimer) clearTimeout(notifTimer);
+  notifTimer = null;
+  if (!authToken || !store.config.settings.twitchNotifs) {
+    if (notifs.list.length || notifs.error) {
+      notifs = { list: [], error: null, loading: false, at: null };
+      notifKnown = null;
+      pushState();
+      updateTrayMenu();
+    }
+    return;
+  }
+  notifs.loading = true;
+  pushState();
+  try {
+    const list = await fetchTwitchNotifications(authToken);
+    // Ohne Link: steht ein bekannter Kanal am Anfang des Texts („KanalEins ist jetzt live …“), diesen öffnen
+    for (const n of list) {
+      if (n.login || n.url) continue;
+      const lower = n.text.toLowerCase();
+      for (const login of store.allLogins()) {
+        const name = (statuses.get(login)?.displayName ?? login).toLowerCase();
+        if (lower.startsWith(name + ' ') || lower.startsWith(login + ' ')) { n.login = login; break; }
+      }
+    }
+    const prevKnown = notifKnown;
+    notifKnown = new Set(list.map((n) => n.id));
+    notifs = { list, error: null, loading: false, at: Date.now() };
+    if (prevKnown && store.config.settings.twitchNotifPopup && Notification.isSupported()) {
+      const fresh = list.filter((n) => !prevKnown.has(n.id) && !n.read).slice(0, 3);
+      for (const f of fresh) {
+        const note = new Notification({ title: 'Twitch', body: f.text, icon: iconPath() });
+        note.on('click', () => {
+          showWindow();
+          openNotif(f);
+        });
+        note.show();
+      }
+    }
+  } catch (err) {
+    notifs = { ...notifs, loading: false, error: err instanceof Error ? err.message : String(err), at: Date.now() };
+  } finally {
+    pushState();
+    updateTrayMenu();
+    scheduleNotifs();
+  }
+}
+
+function openNotif(n: TwitchNotification): void {
+  if (n.login) openChannel(n.login, false);
+  else if (n.url) void shell.openExternal(n.url);
 }
 
 async function refreshMods(): Promise<void> {
@@ -527,6 +599,7 @@ function shortcutFor(input: Electron.Input): string | null {
   if (c === 'KeyD') return 'star';
   if (c === 'KeyM') return 'mute';
   if (c === 'KeyK') return 'tablist';
+  if (c === 'KeyB') return 'notifs-toggle';
   if (c === 'KeyR') return 'reload';
   return null;
 }
@@ -577,6 +650,16 @@ function updateTrayMenu(): void {
     });
     items.push({ type: 'separator' });
   }
+  const unread = notifs ? notifUnread() : 0;
+  if (unread) {
+    items.push({
+      label: `🔔 ${unread} neue Twitch-Benachrichtigung${unread === 1 ? '' : 'en'}`,
+      click: () => {
+        showWindow();
+        win?.webContents.send('shortcut', 'notifs');
+      },
+    }, { type: 'separator' });
+  }
   if (updater?.state.kind === 'ready') {
     items.push({ label: `⬆ Update auf ${updater.state.version} installieren`, click: () => updater.installNow() }, { type: 'separator' });
   }
@@ -625,6 +708,8 @@ async function refreshAuth(): Promise<void> {
     followsCache = null;
     void refreshMods();
     void syncFollows();
+    notifKnown = null;
+    void refreshNotifs();
   }
 }
 
@@ -735,6 +820,7 @@ function buildState() {
     giveawayRules: store.config.giveawayRules,
     defaultRules: DEFAULT_RULES,
     chat: { connected: chat.connected, canSend: chat.canSend, authProblem: chat.authProblem },
+    notifs: { ...notifs, unread: notifUnread(), seenAt: store.config.notifSeenAt },
   };
 }
 
@@ -852,7 +938,7 @@ function registerIpc(): void {
     if (!patch || typeof patch !== 'object') return;
     const p = patch as Partial<Settings>;
     const s = store.config.settings;
-    for (const key of ['closeToTray', 'startInTray', 'autostart', 'muteAutoOpened', 'closeTabWhenOffline', 'giveawayHelper', 'giveawayNotify', 'autoClaimPoints', 'syncFollows', 'followNotify', 'followAutoOpen', 'fullPage', 'singleAudio', 'showFavBar', 'raidPrompt', 'autoUpdate'] as const) {
+    for (const key of ['closeToTray', 'startInTray', 'autostart', 'muteAutoOpened', 'closeTabWhenOffline', 'giveawayHelper', 'giveawayNotify', 'autoClaimPoints', 'syncFollows', 'followNotify', 'followAutoOpen', 'fullPage', 'singleAudio', 'showFavBar', 'raidPrompt', 'autoUpdate', 'twitchNotifs', 'twitchNotifPopup'] as const) {
       if (typeof p[key] === 'boolean') s[key] = p[key] as boolean;
     }
     if (typeof p.pollSeconds === 'number') s.pollSeconds = clampPoll(p.pollSeconds);
@@ -860,6 +946,7 @@ function registerIpc(): void {
     applyAutostart();
     if (p.syncFollows === true) void syncFollows();
     if (typeof p.autoUpdate === 'boolean') updater.setAuto(p.autoUpdate);
+    if (typeof p.twitchNotifs === 'boolean') void refreshNotifs();
     syncChat();
     saveAndPush(typeof p.pollSeconds === 'number');
   });
@@ -993,6 +1080,21 @@ function registerIpc(): void {
     store.config.quickMessages = sanitizeQuickMessages(list);
     saveAndPush(false);
     return store.config.quickMessages;
+  });
+
+  ipcMain.handle('notifs-refresh', () => refreshNotifs());
+  ipcMain.handle('notifs-seen', () => {
+    const newest = Math.max(Date.now(), ...notifs.list.map((n) => n.at ?? 0));
+    if (store.config.notifSeenAt < newest) {
+      store.config.notifSeenAt = newest;
+      store.save();
+      pushState();
+      updateTrayMenu();
+    }
+  });
+  ipcMain.handle('notifs-open', (_e, id: unknown) => {
+    const n = notifs.list.find((x) => x.id === id);
+    if (n) openNotif(n);
   });
 
   ipcMain.handle('open-external', (_e, url: unknown) => {

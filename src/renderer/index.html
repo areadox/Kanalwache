@@ -56,6 +56,18 @@
         <button type="button" class="link-btn danger" id="tab-list-closeall">Alle Tabs schließen</button>
       </div>
     </div>
+    <div id="notif-panel" class="tab-list notif-panel" hidden>
+      <div class="np-head">
+        <strong>Twitch-Benachrichtigungen</strong>
+        <span id="np-status" class="muted"></span>
+        <button type="button" class="icon-btn" id="np-refresh" title="Jetzt abrufen"></button>
+      </div>
+      <div id="np-items" class="tl-items np-items"></div>
+      <div class="tl-foot">
+        <span class="muted">Kanäle öffnen sich hier, alles andere im Browser</span>
+        <button type="button" class="link-btn" id="np-web">Auf twitch.tv</button>
+      </div>
+    </div>
     <div id="views">
       <section id="view-home" class="view home active"></section>
       <section id="view-giveaways" class="view home"></section>
@@ -83,6 +95,9 @@
           <option value="low">Niedrig (2,5 Mbit/s, ca. 1,1 GB pro Stunde)</option>
         </select>
       </label>
+      <h3>Twitch-Benachrichtigungen</h3>
+      <label class="row"><input type="checkbox" data-setting="twitchNotifs"> Benachrichtigungen deines Twitch-Kontos abrufen (Glocke oben rechts)</label>
+      <label class="row"><input type="checkbox" data-setting="twitchNotifPopup"> Neue auch als Windows-Meldung zeigen</label>
       <h3>Kanalpunkte</h3>
       <label class="row"><input type="checkbox" data-setting="autoClaimPoints"> Bonus in offenen Streams automatisch abholen</label>
       <h3>Gefolgte Kanäle</h3>

@@ -39,6 +39,8 @@ interface AppSettings {
   recordQuality: 'high' | 'medium' | 'low';
   followNotify: boolean;
   followAutoOpen: boolean;
+  twitchNotifs: boolean;
+  twitchNotifPopup: boolean;
 }
 
 interface QuickMessage {
@@ -117,6 +119,18 @@ interface AppState {
   /** Dein eigener Kanal, wenn du mit diesem Account angemeldet bist */
   broadcaster: string | null;
   update: { state: UpdateState; version: string; portable: boolean; supported: boolean };
+  notifs: { list: TwitchNotification[]; error: string | null; loading: boolean; at: number | null; unread: number; seenAt: number };
+}
+
+interface TwitchNotification {
+  id: string;
+  text: string;
+  at: number | null;
+  read: boolean;
+  thumbnail: string | null;
+  url: string | null;
+  login: string | null;
+  category: string | null;
 }
 
 type UpdateState =
@@ -156,6 +170,9 @@ interface KanalwacheApi {
   checkNow(): Promise<void>;
   logout(): Promise<void>;
   openExternal(url: string): Promise<void>;
+  notifsRefresh(): Promise<void>;
+  notifsSeen(): Promise<void>;
+  notifsOpen(id: string): Promise<void>;
   onShowGiveaways(cb: () => void): void;
   joinGiveaway(id: string, entry: string): Promise<Result>;
   dismissGiveaway(id: string): Promise<void>;

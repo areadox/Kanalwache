@@ -621,7 +621,16 @@ function renderTabBar(): void {
     onclick: (e: MouseEvent) => { e.stopPropagation(); toggleTabList(); },
   }, icon('list'), tabs.size ? h('span', { class: 'list-count', text: String(tabs.size) }) : null);
 
-  const parts: Child[] = [fixed, h('span', { class: 'tab-sep' }), leftBtn, scroller, rightBtn, listBtn];
+  const unread = state?.notifs?.unread ?? 0;
+  const notifBtn = state?.auth.loggedIn && state.settings.twitchNotifs
+    ? h('button', {
+        id: 'notif-btn', class: `icon-btn list-btn${notifOpen ? ' on-accent' : ''}`, type: 'button',
+        title: unread ? `${unread} neue Twitch-Benachrichtigung${unread === 1 ? '' : 'en'} (Strg+B)` : 'Twitch-Benachrichtigungen (Strg+B)',
+        onclick: (e: MouseEvent) => { e.stopPropagation(); toggleNotifs(); },
+      }, icon('bell'), unread ? h('span', { class: 'list-count notif-count', text: unread > 99 ? '99+' : String(unread) }) : null)
+    : null;
+
+  const parts: Child[] = [fixed, h('span', { class: 'tab-sep' }), leftBtn, scroller, rightBtn, notifBtn, listBtn];
 
   // Werkzeuge des aktiven Tabs stehen in der zweiten Leiste (rechts neben den Favoriten)
   const toolsZone = document.getElementById('tab-tools-zone')!;
@@ -1121,6 +1130,7 @@ let tabListSel = 0;
 
 function toggleTabList(force?: boolean): void {
   tabListOpen = force ?? !tabListOpen;
+  if (tabListOpen && notifOpen) toggleNotifs(false);
   const panel = document.getElementById('tab-list')!;
   panel.hidden = !tabListOpen;
   const sub = document.getElementById('subbar')!;
@@ -1604,6 +1614,8 @@ function handleShortcut(name: string): void {
   const seq = tabSequence();
   const cur = Math.max(0, seq.indexOf(activeId));
   const active = tabs.get(activeId);
+  if (name === 'notifs') { toggleNotifs(true); return; }
+  if (name === 'notifs-toggle') { if (state?.auth.loggedIn && state.settings.twitchNotifs) toggleNotifs(); return; }
   if (name === 'next') activate(seq[(cur + 1) % seq.length]);
   else if (name === 'prev') activate(seq[(cur - 1 + seq.length) % seq.length]);
   else if (name.startsWith('go')) {
@@ -1916,7 +1928,88 @@ function ago(ts: number): string {
   const s = Math.max(0, Math.round((Date.now() - ts) / 1000));
   if (s < 60) return 'gerade eben';
   const m = Math.round(s / 60);
-  return m < 60 ? `vor ${m} Min.` : `vor ${Math.round(m / 60)} Std.`;
+  if (m < 60) return `vor ${m} Min.`;
+  const hrs = Math.round(m / 60);
+  if (hrs < 24) return `vor ${hrs} Std.`;
+  const d = Math.round(hrs / 24);
+  return d === 1 ? 'gestern' : d < 7 ? `vor ${d} Tagen` : new Date(ts).toLocaleDateString('de-DE');
+}
+
+// ---------- Twitch-Benachrichtigungen (Glocke) ----------
+
+let notifOpen = false;
+
+function toggleNotifs(force?: boolean): void {
+  notifOpen = force ?? !notifOpen;
+  const panel = document.getElementById('notif-panel')!;
+  panel.hidden = !notifOpen;
+  const sub = document.getElementById('subbar')!;
+  panel.style.top = `${document.getElementById('tabbar')!.offsetHeight + (sub.hidden ? 0 : sub.offsetHeight) + 4}px`;
+  if (notifOpen) {
+    toggleTabList(false);
+    renderNotifs();
+    // Beim Öffnen gelten alle als gesehen; die Punkte bleiben bis zum Schließen sichtbar
+    notifSeenBefore = state?.notifs.seenAt ?? 0;
+    void api.notifsSeen();
+    const n = state?.notifs;
+    if (n && !n.loading && (!n.at || Date.now() - n.at > 30_000)) void api.notifsRefresh();
+  }
+  document.getElementById('notif-btn')?.classList.toggle('on-accent', notifOpen);
+}
+
+/** seenAt von vor dem Öffnen – damit „neu“ im offenen Fenster markiert bleibt */
+let notifSeenBefore = 0;
+
+function renderNotifs(): void {
+  const n = state?.notifs;
+  const status = document.getElementById('np-status')!;
+  const list = document.getElementById('np-items')!;
+  if (!n || !state) return;
+  status.textContent = n.loading ? 'wird abgerufen …' : n.at ? `aktualisiert ${ago(n.at)}` : '';
+  if (!notifOpen) return;
+  if (!state.auth.loggedIn) {
+    list.replaceChildren(h('p', { class: 'tl-empty muted', text: 'Melde dich bei Twitch an, um deine Benachrichtigungen zu sehen.' }));
+    return;
+  }
+  if (!state.settings.twitchNotifs) {
+    list.replaceChildren(h('p', { class: 'tl-empty muted', text: 'Abruf ist in den Einstellungen ausgeschaltet.' }));
+    return;
+  }
+  const rows: Child[] = [];
+  if (n.error) rows.push(h('p', { class: 'np-error', text: `${n.error} Über „Auf twitch.tv“ siehst du sie trotzdem.` }));
+  if (!n.list.length && !n.error) rows.push(h('p', { class: 'tl-empty muted', text: n.loading ? 'Wird abgerufen …' : 'Keine Benachrichtigungen.' }));
+  for (const x of n.list) {
+    const isNew = !x.read && x.at != null && x.at > notifSeenBefore;
+    const pic = x.thumbnail ?? (x.login ? channelByLogin(x.login)?.status?.avatar ?? null : null);
+    const thumb = pic ? h('img', { class: 'np-thumb', src: pic, alt: '' }) as HTMLImageElement : h('span', { class: 'np-thumb np-thumb-empty' }, icon('bell'));
+    if (thumb instanceof HTMLImageElement) thumb.addEventListener('error', () => thumb.replaceWith(h('span', { class: 'np-thumb np-thumb-empty' }, icon('bell'))));
+    rows.push(h('div', {
+      class: `np-row${isNew ? ' is-new' : ''}${x.url || x.login ? ' clickable' : ''}`,
+      title: x.login ? `${x.login} in Kanalwache öffnen` : x.url ?? '',
+      onclick: () => { if (x.url || x.login) { void api.notifsOpen(x.id); toggleNotifs(false); } },
+    },
+      thumb,
+      h('div', { class: 'np-text' },
+        h('span', { class: 'np-body', text: x.text }),
+        x.at ? h('span', { class: 'np-time muted', text: ago(x.at) }) : null),
+      isNew ? h('span', { class: 'np-dot', title: 'Neu' }) : null));
+  }
+  list.replaceChildren(...rows.filter((r): r is Node | string => !!r));
+}
+
+function setupNotifs(): void {
+  document.getElementById('np-refresh')!.replaceChildren(icon('refresh'));
+  document.getElementById('np-refresh')!.addEventListener('click', () => void api.notifsRefresh());
+  document.getElementById('np-web')!.addEventListener('click', () => {
+    toggleNotifs(false);
+    void api.openExternal('https://www.twitch.tv/');
+  });
+  document.addEventListener('mousedown', (e) => {
+    const target = e.target as HTMLElement;
+    if (notifOpen && !target.closest('#notif-panel') && !target.closest('#notif-btn')) toggleNotifs(false);
+  });
+  window.addEventListener('blur', () => setTimeout(() => { if (notifOpen && !document.querySelector('#notif-panel')?.contains(document.activeElement)) toggleNotifs(false); }, 0));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && notifOpen) toggleNotifs(false); });
 }
 
 /** Was du in das Befehlsfeld getippt hast, bleibt beim Neuzeichnen erhalten. */
@@ -2675,6 +2768,8 @@ function applyState(next: AppState): void {
   renderGiveaways();
   renderUpdate(next);
   renderTabBar();
+  renderNotifs();
+  if (notifOpen && !next.auth.loggedIn) toggleNotifs(false);
 }
 
 async function main(): Promise<void> {
@@ -2705,6 +2800,7 @@ async function main(): Promise<void> {
   document.getElementById('btn-upd-check')!.addEventListener('click', () => void api.updateCheck());
   setInterval(() => void syncVolumes(), 1000);
   setupTabList();
+  setupNotifs();
   api.onToast(toast);
   setupFollowsDialog();
   document.getElementById('fav-filter')!.addEventListener('input', () => renderSidebar());

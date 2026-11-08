@@ -22,6 +22,7 @@ Ein eigener Twitch-Viewer für Windows: dein Kanal und deine Lieblingskanäle an
 - **Gefolgte Kanäle übernehmen**: alle Kanäle, denen du folgst, mit einem Klick in die Liste – auf Wunsch laufend abgeglichen (siehe unten)
 - **Aufnahme**: Streams als Video aufnehmen – nur in Kanälen, in denen du Mod bist (siehe unten)
 - **Raids**: Raidet ein Kanal am Streamende, fragt Kanalwache mit einer Karte nach: mitraiden oder nicht (siehe unten)
+- **Twitch-Benachrichtigungen**: die Meldungen aus Twitchs Glocke direkt in Kanalwache (siehe unten)
 - **Moderation**: erkennt, wo du Mod bist, und öffnet dort mit einem Klick Twitchs Mod-Ansicht – für deinen eigenen Kanal den Stream-Manager (siehe unten)
 
 ## Giveaway-Helfer
@@ -86,6 +87,16 @@ Alle Favoriten stehen in der **Favoritenleiste** – der zweiten Leiste direkt u
 
 Rechts in derselben Leiste stehen die Werkzeuge des aktiven Tabs (Zuschauer/Mod-Ansicht, Kanalpunkte-Kontostand, Chat ein/aus, Aufnehmen, neu laden, im Browser öffnen) – so bleibt die Tab-Leiste oben ganz für die Tabs frei. Bei schmalerem Fenster werden sie zu Symbolen.
 
+## Twitch-Benachrichtigungen
+
+Nach der Anmeldung holt Kanalwache alle 2 Minuten die Benachrichtigungen deines Twitch-Kontos – dieselben, die auf twitch.tv unter der Glocke oben rechts stehen (Live-Meldungen, Clips, Abos, Hinweise von Twitch …).
+
+- Die **Glocke** oben rechts neben der Tab-Liste (oder **Strg+B**) öffnet die Liste; die rote Zahl zeigt, wie viele neu sind. Neue sind farbig hinterlegt und haben einen Punkt – nach dem Öffnen gelten sie als gesehen.
+- **Klick** auf eine Benachrichtigung: Geht es um einen Kanal, öffnet sich sein Stream in Kanalwache; alles andere (z. B. ein Clip) öffnet sich im Browser.
+- Neue Benachrichtigungen stehen auch im Tray-Menü.
+- Einstellungen → *Twitch-Benachrichtigungen*: Abruf ein/aus und, wenn du willst, neue zusätzlich als **Windows-Meldung** (standardmäßig aus, weil Kanalwache bei Live-Gängen schon selbst meldet).
+- Twitch dokumentiert diese Schnittstelle nicht. Ändert Twitch etwas daran, steht in der Liste ein Hinweis – über **Auf twitch.tv** siehst du die Benachrichtigungen dann im Browser.
+
 ## Schnellleiste unter dem Player
 
 Unter jedem Stream (in der Ansicht „nur Player und Chat“) liegt eine Leiste mit:
@@ -130,6 +141,7 @@ Es ist immer nur **ein** Stream zu hören – der, den du gerade ansiehst. Alle 
 | Strg+M | aktiven Stream stumm / laut (bzw. Ton hierher holen) |
 | Strg+R / F5 | aktiven Tab neu laden |
 | Strg+K / Strg+Umschalt+A | Liste aller Tabs |
+| Strg+B | Twitch-Benachrichtigungen |
 | Alt+1 … Alt+9 | Favorit Nr. 1–9 |
 | Alt+→ / Alt+← | nächster / vorheriger Favorit (live oder offen) |
 | Strg+D | aktiven Stream zum Favoriten machen / entfernen |
@@ -262,6 +274,7 @@ Aufbau:
 | `src/rules.ts` | Erkennungswörter: Standardlisten, Prüfung, Umwandlung in Suchmuster |
 | `src/updater.ts` | Update-Funktion (Installer: electron-updater, portabel: Prüfen + Download-Link) |
 | `src/recorder.ts` | Aufnahmen stückweise auf die Platte schreiben |
+| `src/notifications.ts` | Twitch-Benachrichtigungen (Glocke) abrufen |
 | `src/store.ts` | Einstellungen und Kanalliste (JSON) |
 | `src/preload.ts` | Brücke zwischen Oberfläche und Hauptprozess |
 | `src/renderer/` | Oberfläche (Seitenleiste, Übersicht, Giveaways, Erkennungswörter, Tabs mit Mod-Ansicht, Kanalpunkte, Einstellungen) |
