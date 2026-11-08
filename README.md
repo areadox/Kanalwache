@@ -5,6 +5,8 @@ Ein eigener Twitch-Viewer für Windows: dein Kanal und deine Lieblingskanäle an
 ## Funktionen
 
 - **Mein Kanal** und **Lieblingskanäle** in der Seitenleiste, live zuerst (nach Zuschauerzahl sortiert), mit Spiel, Zuschauern und Laufzeit
+- **Kanalliste verstellbar**: am rechten Rand der Liste ziehen macht sie breiter oder schmaler (Doppelklick: Standardbreite); der Pfeil oben neben „Kanalwache“ – oder ganz schmal ziehen – klappt sie auf die Kanalbilder ein. Breite und Zustand werden gemerkt.
+- **Kanal-Einstellungen unter dem Kanal**: fährst du mit der Maus über einen Kanal, erscheinen seine Knöpfe (Glocke, Stern, Auge, Mod-Ansicht, Reihenfolge, Entfernen) in einer eigenen Zeile darunter – Name und Spiel bleiben sichtbar. Eingeschaltete Glocke, Auge und Mod-Ansicht zeigt die Zeile als kleine Symbole an (bei schmaler Liste nur beim Drüberfahren).
 - **Übersicht** mit Vorschaubildern aller Kanäle, die gerade live sind
 - **Streams in Tabs** – nur Player und Chat nebeneinander (Chat-Breite verstellbar, Chat ausblendbar), mehrere Kanäle gleichzeitig; wahlweise die ganze Twitch-Seite
 - **Einmal anmelden**, Login bleibt gespeichert
@@ -88,10 +90,12 @@ Rechts in derselben Leiste stehen die Werkzeuge des aktiven Tabs (Zuschauer/Mod-
 
 Unter jedem Stream (in der Ansicht „nur Player und Chat“) liegt eine Leiste mit:
 
-- **Ton an / Stumm** – wie Strg+M; bei „Ton nur aus einem Tab“ holt der Knopf an einem stummen Tab den Ton hierher.
+- **Ton an / Stumm** – wie Strg+M, schaltet sofort um; bei „Ton nur aus einem Tab“ holt der Knopf an einem stummen Tab den Ton hierher.
 - **Lautstärkeregler** – eine gemeinsame Lautstärke für alle Streams, die gemerkt wird. Kanalwache hält sie in jedem Player gleich, auch wenn Twitch die Lautstärke nach Werbung oder beim Neuladen zurücksetzt. Bewegst du im aktiven Stream Twitchs eigenen Regler, wird das die neue gemeinsame Lautstärke; Twitchs Stumm-Knopf schaltet wie Strg+M um.
 - **Schnellnachrichten** – ein Klick schreibt die Nachricht mit deinem Account in den Chat des Kanals. Der Knopf wird kurz grün, wenn Twitch die Nachricht angenommen hat; lehnt Twitch ab (z. B. Follower-only, Slow-Mode, Timeout), steht der Grund in der Meldung.
 - **Stift** – Schnellnachrichten bearbeiten (auch unter Einstellungen → *Schnellleiste*): Beschriftung und Text, Reihenfolge, bis zu 20 Stück. Platzhalter: `{kanal}` = Name des Kanals, `{ich}` = dein Name. Befehle wie `!lurk` gehen, Twitch-Befehle mit `/` nicht.
+
+Wird das Fenster schmaler, rutschen die Schnellnachrichten in eine zweite Zeile statt aus dem Bild; bei sehr schmalem Player zeigt der Ton-Knopf nur noch das Symbol.
 
 Für die Schnellnachrichten verbindet sich Kanalwache mit dem Chat jedes offenen Stream-Tabs (unabhängig vom Giveaway-Helfer).
 

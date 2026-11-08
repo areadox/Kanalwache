@@ -240,6 +240,60 @@ function makeSplitter(): HTMLElement {
   return handle;
 }
 
+// ---------- Seitenleiste: Breite verstellen und einklappen ----------
+
+const SB_MIN = 210, SB_MAX = 460, SB_DEFAULT = 300;
+let sidebarWidth = (() => { try { const v = Number(localStorage.getItem('kw.sidebarWidth')); return v >= SB_MIN && v <= SB_MAX ? v : SB_DEFAULT; } catch { return SB_DEFAULT; } })();
+let sidebarCollapsed = (() => { try { return localStorage.getItem('kw.sidebarCollapsed') === '1'; } catch { return false; } })();
+
+function applySidebarLayout(): void {
+  document.body.style.setProperty('--sb-w', `${sidebarWidth}px`);
+  document.body.classList.toggle('sb-collapsed', sidebarCollapsed);
+  const btn = document.getElementById('btn-sb-toggle');
+  if (btn) {
+    btn.title = sidebarCollapsed ? 'Kanalliste ausklappen' : 'Kanalliste einklappen (nur Bilder)';
+    btn.replaceChildren(icon(sidebarCollapsed ? 'right' : 'left'));
+  }
+}
+
+function setSidebarCollapsed(v: boolean): void {
+  sidebarCollapsed = v;
+  try { localStorage.setItem('kw.sidebarCollapsed', v ? '1' : '0'); } catch { /* egal */ }
+  applySidebarLayout();
+}
+
+function setupSidebarResizer(): void {
+  const handle = h('div', { class: 'sb-resizer', title: 'Ziehen, um die Kanalliste breiter oder schmaler zu machen · Doppelklick: Standardbreite' });
+  document.getElementById('sidebar')!.append(handle);
+  handle.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    const shield = h('div', { class: 'drag-shield' });
+    document.body.append(shield);
+    const move = (ev: PointerEvent) => {
+      const x = ev.clientX;
+      if (x < SB_MIN - 60) { if (!sidebarCollapsed) setSidebarCollapsed(true); return; }
+      if (sidebarCollapsed) setSidebarCollapsed(false);
+      sidebarWidth = Math.round(Math.min(Math.max(x, SB_MIN), Math.min(SB_MAX, window.innerWidth - 420)));
+      applySidebarLayout();
+    };
+    const up = () => {
+      shield.remove();
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      try { localStorage.setItem('kw.sidebarWidth', String(sidebarWidth)); } catch { /* egal */ }
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  });
+  handle.addEventListener('dblclick', () => {
+    sidebarWidth = SB_DEFAULT;
+    try { localStorage.setItem('kw.sidebarWidth', String(SB_DEFAULT)); } catch { /* egal */ }
+    setSidebarCollapsed(false);
+  });
+  document.getElementById('btn-sb-toggle')!.addEventListener('click', () => setSidebarCollapsed(!sidebarCollapsed));
+  applySidebarLayout();
+}
+
 /** Baut den Inhalt eines Tabs (neu) auf – kompakt (Player + Chat) oder als ganze Seite. */
 function buildTabContent(t: Tab): void {
   t.ready = false;
@@ -769,10 +823,10 @@ function fillQuickbar(t: Tab, bar: HTMLElement): void {
   const vol = h('input', { type: 'range', min: '0', max: '100', step: '1', value: String(quickVolume), class: 'qb-vol', title: 'Lautstärke', 'aria-label': 'Lautstärke' }) as HTMLInputElement;
   vol.addEventListener('input', () => setVolume(t, Number(vol.value)));
   const messages = state?.quickMessages ?? [];
-  bar.dataset.key = JSON.stringify([messages, muted, single && t.id === audioTabId, !!state?.auth.loggedIn]);
+  bar.dataset.key = JSON.stringify([messages, !!state?.auth.loggedIn]);
   bar.replaceChildren(
     h('button', {
-      type: 'button', class: `qb-mute${muted ? ' is-muted' : ''}`,
+      type: 'button', class: `qb-mute${muted ? ' is-muted' : ''}`, 'data-muted': String(muted),
       title: single && t.id !== audioTabId ? 'Ton hierher holen (Strg+M)' : muted ? 'Ton einschalten (Strg+M)' : 'Stumm schalten (Strg+M)',
       onclick: () => toggleMute(t),
     }, icon(muted ? 'mute' : 'volume'), h('span', { text: muted ? 'Stumm' : 'Ton an' })),
@@ -796,10 +850,24 @@ function fillQuickbar(t: Tab, bar: HTMLElement): void {
 function updateQuickbars(): void {
   for (const t of tabs.values()) {
     if (!t.qbar || !t.qbar.isConnected) continue;
-    const muted = t.ready && t.wv.isAudioMuted();
-    const key = JSON.stringify([state?.quickMessages ?? [], muted, singleAudio() && t.id === audioTabId, !!state?.auth.loggedIn]);
-    if (t.qbar.dataset.key !== key && !t.qbar.contains(document.activeElement)) fillQuickbar(t, t.qbar);
+    // Stumm-Knopf sofort anpassen – auch wenn er gerade den Fokus hat (sonst sprang die Anzeige erst verzögert um)
+    updateMuteButton(t);
+    const key = JSON.stringify([state?.quickMessages ?? [], !!state?.auth.loggedIn]);
+    const focusInMsgs = !!t.qbar.querySelector('.qb-msgs')?.contains(document.activeElement);
+    if (t.qbar.dataset.key !== key && !focusInMsgs) fillQuickbar(t, t.qbar);
   }
+}
+
+function updateMuteButton(t: Tab): void {
+  const btn = t.qbar?.querySelector<HTMLButtonElement>('.qb-mute');
+  if (!btn) return;
+  const muted = t.ready && t.wv.isAudioMuted();
+  const title = singleAudio() && t.id !== audioTabId ? 'Ton hierher holen (Strg+M)' : muted ? 'Ton einschalten (Strg+M)' : 'Stumm schalten (Strg+M)';
+  if (btn.dataset.muted === String(muted) && btn.title === title) return;
+  btn.dataset.muted = String(muted);
+  btn.title = title;
+  btn.classList.toggle('is-muted', muted);
+  btn.replaceChildren(icon(muted ? 'mute' : 'volume'), h('span', { text: muted ? 'Stumm' : 'Ton an' }));
 }
 
 // ---------- Schnellnachrichten bearbeiten ----------
@@ -953,6 +1021,7 @@ function setAudioTab(id: string | null, muted = false): void {
 
 function toggleMute(t: Tab): void {
   if (t.kind !== 'stream' || !t.ready) return;
+  queueMicrotask(() => { for (const x of tabs.values()) updateMuteButton(x); });
   if (singleAudio()) {
     // Am Ton-Tab: stumm/laut. An einem anderen Tab: Ton hierher holen.
     if (t.id === audioTabId) setAudioTab(t.id, !audioMuted);
@@ -1605,6 +1674,10 @@ function channelRow(c: ChannelView, opts: { own: boolean; index?: number; count?
         isMod(c.login) ? ' · ' : null,
         sub),
     ),
+    h('span', { class: 'channel-flags' },
+      c.notify ? h('span', { class: 'flag', title: 'Benachrichtigung an' }, icon('bell')) : null,
+      c.autoOpen ? h('span', { class: 'flag', title: 'Schaut automatisch zu, wenn live' }, icon('eye')) : null,
+      isMod(c.login) && c.openAsMod ? h('span', { class: 'flag mod', title: 'Öffnet gleich die Mod-Ansicht' }, icon('shield')) : null),
     s?.live ? h('span', { class: 'viewers', text: fmtViewers(s.viewers) }) : null,
     h('div', { class: 'channel-actions' },
       iconButton('bell', c.notify ? 'Benachrichtigung aus' : 'Benachrichtigen, wenn live', (e) => {
@@ -2606,6 +2679,7 @@ function applyState(next: AppState): void {
 
 async function main(): Promise<void> {
   applyChatLayout();
+  setupSidebarResizer();
   setupSettings();
   setupRulesDialog();
   setInterval(() => void claimPoints(), 15_000);
