@@ -431,6 +431,7 @@ function closeTab(id: string, batch = false, recStopped = false): void {
   const idx = seq.indexOf(id);
   t.view.remove();
   tabs.delete(id);
+  renderClaimbars();
   if (batch) return;
   if (audioTabId === id) audioTabId = null;
   if (activeId === id) {
@@ -2522,10 +2523,7 @@ async function claimPoints(): Promise<void> {
         const r = (await target.executeJavaScript(claimJs(auto))) as { claimed: boolean; available: boolean; balance: string | null } | null;
         if (!r) continue;
         const ready = r.available && !r.claimed;
-        if (ready !== t.bonusReady) {
-          t.bonusReady = ready;
-          renderClaimbar(t);
-        }
+        if (ready !== t.bonusReady) t.bonusReady = ready;
         if (r.balance && r.balance !== t.balance) {
           t.balance = r.balance;
           changed = true;
@@ -2541,6 +2539,8 @@ async function claimPoints(): Promise<void> {
   } finally {
     claimRunning = false;
     if (changed) renderTabBar();
+    // Abhol-Leisten aller Streams zeigen die Boni aller Streams
+    renderClaimbars();
   }
 }
 
@@ -2559,7 +2559,7 @@ async function claimBonusNow(t: Tab): Promise<void> {
     toast('Bonus konnte nicht abgeholt werden – Chat lädt gerade.');
   }
   t.bonusReady = false;
-  renderClaimbar(t);
+  renderClaimbars();
   renderTabBar();
 }
 
@@ -2568,16 +2568,23 @@ function renderClaimbar(t: Tab): void {
   const bar = t.cbar;
   if (!bar || !bar.isConnected) return;
   const items: Child[] = [];
-  if (t.bonusReady && !state?.settings.autoClaimPoints) {
-    items.push(h('button', { type: 'button', class: 'cb-btn cb-bonus', title: 'Kanalpunkte-Bonus in diesem Stream abholen', onclick: () => void claimBonusNow(t) },
-      icon('gift'), h('span', { text: 'Bonus abholen' })));
+  // Boni aller offenen Streams – der eigene zuerst, dann die übrigen in Tab-Reihenfolge
+  const ready = state?.settings.autoClaimPoints ? [] : [...tabs.values()].filter((x) => x.kind === 'stream' && x.bonusReady);
+  ready.sort((a, b) => (a === t ? -1 : b === t ? 1 : 0));
+  for (const x of ready) {
+    const name = tabLabel(x);
+    items.push(h('button', {
+      type: 'button', class: `cb-btn cb-bonus${x === t ? '' : ' cb-other'}`,
+      title: x === t ? `Kanalpunkte-Bonus bei ${name} abholen` : `Kanalpunkte-Bonus bei ${name} abholen (Stream läuft in einem anderen Tab)`,
+      onclick: () => void claimBonusNow(x),
+    }, icon('gift'), h('span', { class: 'cb-label', text: `Bonus: ${name}` })));
   }
   if (drops.ready && !state?.settings.autoClaimDrops) {
     const names = drops.names.join(', ');
     items.push(h('button', { type: 'button', class: 'cb-btn cb-drop', title: `Fertige Drops abholen: ${names}`, onclick: () => void claimDropsNow() },
       icon('trophy'), h('span', { class: 'cb-label', text: drops.ready === 1 ? `Drop abholen: ${names}` : `${drops.ready} Drops abholen` })));
   }
-  const key = JSON.stringify([t.bonusReady && !state?.settings.autoClaimPoints, drops.ready, drops.names, !!state?.settings.autoClaimDrops]);
+  const key = JSON.stringify([ready.map((x) => x.id), drops.ready, drops.names, !!state?.settings.autoClaimDrops]);
   if (bar.dataset.key === key) return;
   bar.dataset.key = key;
   bar.replaceChildren(...items.filter((x): x is HTMLElement => !!x));

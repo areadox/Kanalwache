@@ -62,7 +62,7 @@ Dazu die Zahl, ab wie vielen Leuten (innerhalb von 30 Sekunden) ein Giveaway ohn
 
 ## Kanalpunkte
 
-In jedem offenen Stream-Tab schaut Kanalwache alle 15 Sekunden nach, ob der Bonus bereitsteht. Ist er da, erscheint über der Schnellleiste (Ton, Chat-Befehle) eine **Abhol-Leiste** mit dem Knopf **Bonus abholen** – ein Klick, fertig. Die Leiste ist nur zu sehen, wenn es etwas abzuholen gibt. Der aktuelle Kontostand steht im Tab (🪙); wurde in dieser Sitzung schon ein Bonus abgeholt, ist die Zahl farbig, der Tooltip zeigt wie oft.
+In jedem offenen Stream-Tab schaut Kanalwache alle 15 Sekunden nach, ob der Bonus bereitsteht. Ist er da, erscheint über der Schnellleiste (Ton, Chat-Befehle) eine **Abhol-Leiste** mit einem Knopf **Bonus: Kanalname** – ein Klick, fertig. Die Leiste zeigt in jedem Stream die Boni **aller** offenen Streams (der gerade angezeigte zuerst, die anderen etwas blasser), du musst also nicht durch die Tabs klicken. Die Leiste ist nur zu sehen, wenn es etwas abzuholen gibt. Der aktuelle Kontostand steht im Tab (🪙); wurde in dieser Sitzung schon ein Bonus abgeholt, ist die Zahl farbig, der Tooltip zeigt wie oft.
 
 - Funktioniert nur, wenn du angemeldet bist. Der Bonus wird im Chat neben dem Player abgeholt – auch wenn der Chat ausgeblendet ist.
 - Punkte gibt es nur für Streams, die in Kanalwache offen sind – am einfachsten mit dem Augen-Symbol (automatisch zuschauen). Dein eigener Kanal wird übersprungen.

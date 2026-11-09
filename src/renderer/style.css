@@ -964,3 +964,4 @@ main { position: relative; }
   background: rgba(255, 179, 71, .15); color: #ffc66d; white-space: nowrap;
 }
 .setting-hint { margin: 2px 0 10px 26px; font-size: 12px; line-height: 1.45; color: var(--muted); max-width: 560px; }
+.cb-other { background: rgba(145, 71, 255, .45); }
