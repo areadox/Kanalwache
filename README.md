@@ -199,7 +199,7 @@ Nach der Anmeldung holt **Gefolgte Kanäle übernehmen …** (unter der Kanallis
 
 Raidet einer deiner Kanäle am Streamende einen anderen, blendet Kanalwache unten rechts eine **Raid-Karte** ein – „PixelPaula raidet KanalEins“ – mit zwei Knöpfen:
 
-- **Mitraiden**: Kanalwache sagt Twitch Bescheid (Knopf im Raid-Banner), öffnet den Zielkanal als neuen Tab, holt den Ton dorthin und schließt den alten Tab.
+- **Mitraiden**: Kanalwache sagt Twitch Bescheid (Knopf im Raid-Banner) und **wartet, bis der Raid durch ist**: Erst wenn im Chat des raidenden Kanals Twitchs Abschluss-Zeile kommt („… hat … geraidet“ / „… weitergeleitet“), öffnet sich der geraidete Kanal als neuer Tab (mit Ton) und der Tab des Raiders schließt sich. Bis dahin steht auf der Karte „Mitraiden zugesagt“ mit **Jetzt wechseln** und **Abbrechen**. Wird der Abschluss nicht erkannt, wechselt Kanalwache spätestens nach 2½ Minuten oder sobald der Tab des Raiders zugeht. Ist der Raid beim Klick schon durch (Karte *Raid abgeschlossen*), wird sofort gewechselt.
 - **Nicht mitraiden**: Karte schließen; gibt es im Raid-Banner einen „Verlassen“-Knopf, wird er gedrückt.
 
 Die Karte bleibt **3 Minuten** stehen (beim Drüberfahren hält der Balken an) – ist das Fenster gerade nicht im Vordergrund, kommt zusätzlich eine Windows-Benachrichtigung.
@@ -207,7 +207,7 @@ Die Karte bleibt **3 Minuten** stehen (beim Drüberfahren hält der Balken an) �
 Erkannt wird ein Raid auf drei Wegen:
 
 1. **Raid-Banner im Chat** eines offenen Streams: Twitch zeigt beim Raid ein Banner mit Zielkanal und Countdown – Kanalwache schaut alle 2,5 Sekunden danach.
-2. **Abschluss-Zeile im Chat**: Ist der Raid durch, schreibt Twitch eine Zeile in den Chatverlauf („PixelPaula hat KanalEins mit 87 Zuschauern geraidet“, „… has raided …“, „Ihr werdet zu … weitergeleitet“). Dann erscheint die Karte als *Raid abgeschlossen*. Berücksichtigt werden nur Systemzeilen von Twitch ohne Absender – schreibt ein Zuschauer „Raid zu X“, passiert nichts; eingehende Raids („NachtEule raidet mit 12 Zuschauern“) werden ebenfalls ignoriert.
+2. **Abschluss-Zeile im Chat**: Ist der Raid durch, schreibt Twitch eine Zeile in den Chatverlauf („PixelPaula hat KanalEins mit 87 Zuschauern geraidet“, „… has raided …“, „Ihr werdet zu … weitergeleitet“). Dann erscheint die Karte als *Raid abgeschlossen*. Twitchs Ansage „PixelPaula raidet jetzt KanalEins …“ zählt dagegen noch nicht als Abschluss – dann kommt die normale Raid-Karte. Berücksichtigt werden nur Systemzeilen von Twitch ohne Absender – schreibt ein Zuschauer „Raid zu X“, passiert nichts; eingehende Raids („NachtEule raidet mit 12 Zuschauern“) werden ebenfalls ignoriert.
 3. **Ansage im Chat**: Schreiben Streamer, Mod oder Bot etwa „Wir raiden jetzt @kanal“ und geht der Kanal danach offline, erscheint die Karte als *Raid (vermutlich)*. Das funktioniert auch für Lieblingskanäle ohne offenen Tab, solange der Giveaway-Helfer den Chat mitliest. Danksagungen für eingehende Raids („Danke für den Raid!“) werden ignoriert.
 
 Abschalten lässt sich das in den Einstellungen unter *Raids*.

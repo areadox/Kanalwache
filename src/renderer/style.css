@@ -965,3 +965,5 @@ main { position: relative; }
 }
 .setting-hint { margin: 2px 0 10px 26px; font-size: 12px; line-height: 1.45; color: var(--muted); max-width: 560px; }
 .cb-other { background: rgba(145, 71, 255, .45); }
+.raid-card.armed .raid-bar { display: none; }
+.raid-wait { color: var(--text); }

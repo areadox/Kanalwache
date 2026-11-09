@@ -1467,7 +1467,7 @@ const RAID_JS = `(() => {
  * nur Systemzeilen ohne Absender, damit Zuschauer-Nachrichten wie „Raid zu X lol“ nichts auslösen.
  * Wird per toString() in die Seite geschickt, darf also nichts von außen benutzen.
  */
-function raidDoneScan(source: string, display: string): { target: string; name: string; text: string } | null {
+function raidDoneScan(source: string, display: string, strict = false): { target: string; name: string; text: string; done: boolean } | null {
   const norm = (x: string | null) => (x || '').replace(/\s+/g, ' ').trim();
   const log = document.querySelector('[data-test-selector="chat-scrollable-area__message-container"], .chat-scrollable-area__message-container, [role="log"]');
   if (!log) return null;
@@ -1492,6 +1492,9 @@ function raidDoneScan(source: string, display: string): { target: string; name: 
     else if ((m = t.match(new RegExp('^' + NAME + '\\s+(?:raidet|is\\s+raiding)\\s+(?:jetzt\\s+)?' + NAME, 'i'))) && isSrc(m[1]) && !noise.test(m[2])) target = m[2];
     else if ((m = t.match(new RegExp('(?:raid\\s+(?:zu|to|nach|auf|bei)|now\\s+raiding|raiding|raidet\\s+jetzt|(?:zu|nach)(?=\\s+@?[A-Za-z0-9_]{3,25}\\s+weitergeleitet)|redirect(?:ing|ed)?\\s+to)\\s+' + NAME, 'i')))
       && /zuschauer|viewers|weitergeleitet|redirect|abgeschlossen|complete|erfolgreich|successful/i.test(t)) target = m[1];
+    // Echter Abschluss („hat … geraidet“, „wird weitergeleitet“, „abgeschlossen“) – oder nur die Ansage „raidet jetzt …“?
+    const done = /geraidet|raided|weitergeleitet|redirected|abgeschlossen|complete|erfolgreich|successful/i.test(t);
+    if (target && strict && !done) target = null;
     if (target && !isSrc(target) && !noise.test(target)) {
       // Steht der Name als Link da, gilt der Kanal aus dem Link (Anzeigename kann vom Login abweichen)
       let login = target;
@@ -1499,7 +1502,7 @@ function raidDoneScan(source: string, display: string): { target: string; name: 
         const hm = (a.getAttribute('href') || '').match(/(?:^|twitch\.tv)\/([A-Za-z0-9_]{3,25})(?:[/?#]|$)/);
         if (hm && norm(a.textContent).toLowerCase() === target.toLowerCase()) login = hm[1];
       }
-      return { target: login, name: target, text: t.slice(0, 200) };
+      return { target: login, name: target, text: t.slice(0, 200), done };
     }
   }
   return null;
@@ -1516,14 +1519,46 @@ function raidClickJs(kind: 'join' | 'leave'): string {
   })()`;
 }
 
+/** Zugesagte Raids je Quelle: gewechselt wird erst, wenn der Raid im Chat der Quelle durch ist */
+const armedRaids = new Map<string, { target: string; targetName: string; at: number; onDone: () => void }>();
+/** Spätestens danach wechseln, falls die Abschluss-Zeile nicht erkannt wird (Twitchs Countdown: bis 90 s) */
+const RAID_ARM_MAX_MS = 150_000;
+
+/** Raid vollziehen: erst den geraideten Kanal öffnen, dann den Tab des Raiders schließen. */
+function completeRaid(source: string, target: string, targetName: string): void {
+  const armed = armedRaids.get(source);
+  armedRaids.delete(source);
+  armed?.onDone();
+  openStream(target.toLowerCase(), { auto: false, muted: false, focus: true });
+  const src = tabs.get(`stream:${source}`);
+  if (src) setTimeout(() => { if (tabs.has(src.id)) closeTab(src.id); }, 400);
+  toast(`Raid ist durch – weiter bei ${targetName}.`);
+}
+
 async function watchRaids(): Promise<void> {
-  if (raidScan || !state?.settings.raidPrompt) return;
+  if (raidScan) return;
   raidScan = true;
   try {
+    // Zugesagte Raids: Quelle zu, zu lange gewartet → jetzt wechseln
+    for (const [source, a] of armedRaids) {
+      const src = tabs.get(`stream:${source}`);
+      if (!src || Date.now() - a.at > RAID_ARM_MAX_MS) completeRaid(source, a.target, a.targetName);
+    }
+    if (!state?.settings.raidPrompt && !armedRaids.size) return;
     for (const t of tabs.values()) {
       if (t.kind !== 'stream' || !t.login || t.mode !== 'viewer') continue;
       const target = t.chat ?? t.wv;
       if (!(t.chat ? t.chatReady : t.ready)) continue;
+      const armed = armedRaids.get(t.login);
+      if (armed) {
+        // Auf Twitchs Abschluss-Zeile im alten Chat warten („… hat … geraidet“ / „wird weitergeleitet“)
+        try {
+          const d = (await target.executeJavaScript(`(${raidDoneScan.toString()})(${JSON.stringify(t.login)}, ${JSON.stringify(nameOf(t.login))}, true)`)) as { target: string } | null;
+          if (d) completeRaid(t.login, armed.target, armed.targetName);
+        } catch { /* Seite lädt gerade */ }
+        continue;
+      }
+      if (!state?.settings.raidPrompt) continue;
       try {
         const r = (await target.executeJavaScript(RAID_JS)) as { target: string; name: string; text: string; join: boolean; leave: boolean } | null;
         if (r && r.target.toLowerCase() !== t.login) {
@@ -1531,8 +1566,9 @@ async function watchRaids(): Promise<void> {
           continue;
         }
         // Kein Banner (mehr)? Dann nach Twitchs Abschluss-Zeile im Chatverlauf schauen
-        const d = (await target.executeJavaScript(`(${raidDoneScan.toString()})(${JSON.stringify(t.login)}, ${JSON.stringify(nameOf(t.login))})`)) as { target: string; name: string; text: string } | null;
-        if (d && d.target.toLowerCase() !== t.login) showRaid({ source: t.login, target: d.target, name: d.name, guessed: false, done: true, text: d.text, join: false, leave: false });
+        const d = (await target.executeJavaScript(`(${raidDoneScan.toString()})(${JSON.stringify(t.login)}, ${JSON.stringify(nameOf(t.login))})`)) as { target: string; name: string; text: string; done: boolean } | null;
+        // done=false: nur Twitchs Ansage „X raidet jetzt Y“ – Raid läuft noch, Mitraiden wartet auf den Abschluss
+        if (d && d.target.toLowerCase() !== t.login) showRaid({ source: t.login, target: d.target, name: d.name, guessed: false, done: d.done, text: d.text, join: false, leave: false });
       } catch {
         // Seite lädt gerade
       }
@@ -1568,16 +1604,32 @@ function showRaid(r: RaidInfo): void {
     setTimeout(() => card.remove(), 220);
   };
   const joinRaid = () => {
-    close();
     const src = tabs.get(`stream:${r.source}`);
-    // Twitch Bescheid geben (Banner-Knopf), dann zum Ziel wechseln und die Quelle schließen
+    // Twitch Bescheid geben (Banner-Knopf)
     if (src && (src.chat ? src.chatReady : src.ready) && (card.dataset.banner === '1' || r.join)) {
       void (src.chat ?? src.wv).executeJavaScript(raidClickJs('join')).catch(() => {});
     }
-    openStream(r.target.toLowerCase(), { auto: false, muted: false, focus: true });
-    if (src) setTimeout(() => closeTab(src.id), 1500);
-    toast(`Du raidest mit zu ${targetName}.`);
+    // Raid schon durch, Stream schon zu Ende oder Quelle nicht offen → sofort wechseln
+    if (r.done || r.guessed || !src) {
+      close();
+      completeRaid(r.source, r.target, targetName);
+      return;
+    }
+    // Sonst warten, bis im Chat der Quelle der Abschluss kommt – erst dann wechseln und die Quelle schließen
+    clearInterval(timer);
+    card.classList.add('armed');
+    status.textContent = `Mitraiden zugesagt – sobald der Raid durch ist, öffnet sich ${targetName} und dieser Tab schließt sich.`;
+    status.hidden = false;
+    actions.replaceChildren(
+      h('button', { type: 'button', class: 'btn', text: 'Abbrechen', onclick: () => { armedRaids.delete(r.source); close(); toast('Mitraiden abgebrochen.'); } }),
+      h('button', { type: 'button', class: 'btn primary raid-go', onclick: () => completeRaid(r.source, r.target, targetName) }, icon('sword'), h('span', { text: 'Jetzt wechseln' })),
+    );
+    armedRaids.set(r.source, { target: r.target, targetName, at: Date.now(), onDone: () => close() });
+    toast(`Mitraiden zugesagt – gewechselt wird, wenn der Raid durch ist.`);
   };
+  const status = h('p', { class: 'raid-hint raid-wait' });
+  status.hidden = true;
+  const actions = h('div', { class: 'raid-actions' });
   const declineRaid = () => {
     close();
     const src = tabs.get(`stream:${r.source}`);
@@ -1597,11 +1649,13 @@ function showRaid(r: RaidInfo): void {
         h('strong', { text: fromName }), r.done ? ' hat ' : ' raidet ', h('strong', { class: 'raid-target', text: targetName }), r.done ? ' geraidet' : null)),
     r.text ? h('p', { class: 'raid-text', text: r.text }) : null,
     r.guessed ? h('p', { class: 'raid-hint', text: 'Aus der Ansage im Chat geschlossen – der Stream ist gerade zu Ende gegangen.' }) : null,
-    h('div', { class: 'raid-actions' },
-      h('button', { type: 'button', class: 'btn', text: 'Nicht mitraiden', onclick: declineRaid }),
-      h('button', { type: 'button', class: 'btn primary raid-go', onclick: joinRaid }, icon('sword'), h('span', { text: 'Mitraiden' }))),
+    status,
+    actions,
     bar,
   );
+  actions.append(
+    h('button', { type: 'button', class: 'btn', text: 'Nicht mitraiden', onclick: declineRaid }),
+    h('button', { type: 'button', class: 'btn primary raid-go', onclick: joinRaid }, icon('sword'), h('span', { text: 'Mitraiden' })));
   if (!r.guessed) card.dataset.banner = '1';
 
   // 3 Minuten stehen lassen; beim Drüberfahren anhalten
