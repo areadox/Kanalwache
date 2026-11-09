@@ -96,6 +96,8 @@ export interface Config {
   quickMessages: QuickMessage[];
   /** Bis wann die Twitch-Benachrichtigungen angesehen wurden (ms) – neuere zählen als ungelesen */
   notifSeenAt: number;
+  /** Stand der Einstellungs-Umstellungen (1 = Auto-Abholen standardmäßig aus) */
+  settingsRev: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -107,7 +109,7 @@ export const DEFAULT_SETTINGS: Settings = {
   closeTabWhenOffline: true,
   giveawayHelper: true,
   giveawayNotify: true,
-  autoClaimPoints: true,
+  autoClaimPoints: false,
   syncFollows: false,
   fullPage: false,
   singleAudio: true,
@@ -121,7 +123,7 @@ export const DEFAULT_SETTINGS: Settings = {
   twitchNotifs: true,
   twitchNotifPopup: false,
   dropsCheck: true,
-  autoClaimDrops: true,
+  autoClaimDrops: false,
   dropsNotify: true,
 };
 
@@ -179,6 +181,13 @@ export class Store {
       if (typeof settingsRaw[key] === typeof DEFAULT_SETTINGS[key]) (settings as any)[key] = settingsRaw[key];
     }
     settings.pollSeconds = clampPoll(settings.pollSeconds);
+    // Einmalige Umstellung: automatisches Abholen (Kanalpunkte, Drops) aus – Twitch verbietet Automatik.
+    // Wer es danach bewusst wieder einschaltet, behält es.
+    const settingsRev = typeof raw.settingsRev === 'number' ? raw.settingsRev : 0;
+    if (settingsRev < 1) {
+      settings.autoClaimPoints = false;
+      settings.autoClaimDrops = false;
+    }
     if (!['high', 'medium', 'low'].includes(settings.recordQuality)) settings.recordQuality = 'high';
     return {
       own: sanitizeChannel(raw.own, { autoOpen: false, notify: false, openAsMod: false, fromFollows: false }),
@@ -189,6 +198,7 @@ export class Store {
       starred: Array.isArray(raw.starred)
         ? [...new Set((raw.starred as unknown[]).map((x) => (typeof x === 'string' ? normalizeLogin(x) : null)).filter((x): x is string => !!x))]
         : [],
+      settingsRev: 1,
       notifSeenAt: typeof raw.notifSeenAt === 'number' && Number.isFinite(raw.notifSeenAt) ? raw.notifSeenAt : 0,
       ignoredFollows: Array.isArray(raw.ignoredFollows)
         ? [...new Set((raw.ignoredFollows as unknown[]).map((x) => (typeof x === 'string' ? normalizeLogin(x) : null)).filter((x): x is string => !!x))]

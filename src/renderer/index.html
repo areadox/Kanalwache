@@ -75,7 +75,7 @@
         <div class="drops-bar">
           <strong>Drops</strong>
           <span id="drops-status" class="muted"></span>
-          <label class="drops-auto"><input type="checkbox" id="drops-auto"> Automatisch abholen</label>
+          <label class="drops-auto" title="Gegen Twitchs Nutzungsbedingungen (Automatik) – auf eigenes Risiko. Aus: Abholen-Knopf über der Schnellleiste."><input type="checkbox" id="drops-auto"> Automatisch abholen</label>
           <button type="button" class="icon-btn" id="drops-reload" title="Inventar neu laden"></button>
           <button type="button" class="icon-btn" id="drops-web" title="Im Browser öffnen"></button>
         </div>
@@ -110,10 +110,12 @@
       <label class="row"><input type="checkbox" data-setting="twitchNotifPopup"> Neue auch als Windows-Meldung zeigen</label>
       <h3>Drops</h3>
       <label class="row"><input type="checkbox" data-setting="dropsCheck"> Drop-Inventar regelmäßig prüfen</label>
-      <label class="row"><input type="checkbox" data-setting="autoClaimDrops"> Fertige Drops automatisch abholen</label>
+      <label class="row"><input type="checkbox" data-setting="autoClaimDrops"> Fertige Drops automatisch abholen <span class="warn-tag">gegen Twitch-Regeln</span></label>
+      <p class="setting-hint">Ausgeschaltet erscheint über der Schnellleiste jedes Streams ein <b>Drop abholen</b>-Knopf, sobald ein Drop fertig ist. Zum automatischen Abholen siehe den Hinweis unter „Kanalpunkte“.</p>
       <label class="row"><input type="checkbox" data-setting="dropsNotify"> Windows-Meldung, wenn ein Drop bereit ist oder abgeholt wurde</label>
       <h3>Kanalpunkte</h3>
-      <label class="row"><input type="checkbox" data-setting="autoClaimPoints"> Bonus in offenen Streams automatisch abholen</label>
+      <label class="row"><input type="checkbox" data-setting="autoClaimPoints"> Bonus in offenen Streams automatisch abholen <span class="warn-tag">gegen Twitch-Regeln</span></label>
+      <p class="setting-hint">Hinweis: Twitch verbietet in seinen Nutzungsbedingungen, den Dienst „automatisiert“ zu nutzen. Automatisches Abholen ist eine solche Automatik – bisher gab es dafür keine bekannten Sperrwellen, erlaubt ist es aber nicht. Gefährdet wäre dein Twitch-Konto. Ausgeschaltet zeigt Kanalwache einen <b>Abholen</b>-Knopf über der Schnellleiste des Streams, und du klickst selbst.</p>
       <h3>Gefolgte Kanäle</h3>
       <label class="row"><input type="checkbox" data-setting="syncFollows"> Automatisch abgleichen: neue Follows hinzufügen, entfolgte entfernen</label>
       <div class="row"><button type="button" class="btn small" id="btn-follows-2">Gefolgte Kanäle übernehmen …</button></div>

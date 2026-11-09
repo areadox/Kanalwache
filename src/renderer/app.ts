@@ -133,6 +133,10 @@ interface Tab {
   recStarting: boolean;
   /** Schnellleiste unter dem Player (nur kompakte Ansicht) */
   qbar: HTMLElement | null;
+  /** Leiste über der Schnellleiste: „Bonus abholen“ / „Drop abholen“, nur wenn es etwas gibt */
+  cbar: HTMLElement | null;
+  /** Kanalpunkte-Bonus liegt bereit (nur ohne automatisches Abholen) */
+  bonusReady: boolean;
 }
 
 const tabs = new Map<string, Tab>();
@@ -314,10 +318,12 @@ function buildTabContent(t: Tab): void {
     });
     t.view.className = 'view stream compact' + (t.id === activeId ? ' active' : '');
     t.view.replaceChildren(
-      h('div', { class: 'player-pane' }, h('div', { class: 'player-stage' }, t.wv), (t.qbar = buildQuickbar(t))),
+      h('div', { class: 'player-pane' }, h('div', { class: 'player-stage' }, t.wv), (t.cbar = h('div', { class: 'claimbar', role: 'toolbar', 'aria-label': 'Abholen' })), (t.qbar = buildQuickbar(t))),
       makeSplitter(),
       h('div', { class: 'chat-pane' }, t.chat),
     );
+    t.cbar!.hidden = true;
+    renderClaimbar(t);
   } else {
     const url = t.kind === 'login' ? 'https://www.twitch.tv/login' : urlFor(t.login!, t.mode);
     t.wv = createWebview(url, onPlayerReady);
@@ -377,7 +383,7 @@ function openStream(login: string, opts: { auto: boolean; muted: boolean; focus:
   const tab: Tab = {
     id, kind: 'stream', login, auto: opts.auto, button: h('div'), view,
     wv: null as unknown as WebviewEl, ready: false, chat: null, chatReady: false, muted: opts.muted,
-    mode, claims: 0, balance: null, playing: null, rec: null, recStarting: false, qbar: null,
+    mode, claims: 0, balance: null, playing: null, rec: null, recStarting: false, qbar: null, cbar: null, bonusReady: false,
   };
   buildTabContent(tab);
   tabs.set(id, tab);
@@ -399,7 +405,7 @@ function openLogin(): void {
   const tab: Tab = {
     id, kind: 'login', login: null, auto: false, button: h('div'), view,
     wv: null as unknown as WebviewEl, ready: false, chat: null, chatReady: false, muted: false,
-    mode: 'viewer', claims: 0, balance: null, playing: null, rec: null, recStarting: false, qbar: null,
+    mode: 'viewer', claims: 0, balance: null, playing: null, rec: null, recStarting: false, qbar: null, cbar: null, bonusReady: false,
   };
   buildTabContent(tab);
   tabs.set(id, tab);
@@ -2411,7 +2417,33 @@ async function scanDrops(): Promise<void> {
     dropsScanning = false;
     renderDropsBar();
     renderTabBar();
+    renderClaimbars();
   }
+}
+
+/** Fertige Drops jetzt abholen (Klick in der Abhol-Leiste eines Streams) */
+async function claimDropsNow(): Promise<void> {
+  if (!dropsWv || !dropsReady) {
+    toast('Drop-Inventar lädt noch – gleich nochmal versuchen.');
+    return;
+  }
+  try {
+    const r = (await dropsWv.executeJavaScript(dropsScanJs(true))) as { clicked: number; names: string[] } | null;
+    if (r?.clicked) {
+      toast(`Drop abgeholt: ${r.names.join(', ')}`);
+      drops.ready = 0;
+      drops.names = [];
+      setTimeout(() => void scanDrops(), 5000);
+    } else {
+      toast('Kein Drop mehr abzuholen.');
+      void scanDrops();
+    }
+  } catch {
+    toast('Drop konnte nicht abgeholt werden.');
+  }
+  renderDropsBar();
+  renderTabBar();
+  renderClaimbars();
 }
 
 function setupDrops(): void {
@@ -2432,9 +2464,10 @@ function setupDrops(): void {
 
 // ---------- Kanalpunkte ----------
 
-/** Läuft in der Twitch-Seite: liest den Kontostand und klickt den Bonus, falls er da ist. */
-const CLAIM_JS = `(() => {
-  const r = { claimed: false, balance: null };
+/** Läuft in der Twitch-Seite: liest den Kontostand, meldet einen bereitliegenden Bonus und klickt ihn auf Wunsch. */
+function claimJs(click: boolean): string {
+  return `(() => {
+  const r = { claimed: false, available: false, balance: null };
   const bal = document.querySelector('[data-test-selector="copo-balance-string"]');
   if (bal) r.balance = (bal.textContent || '').trim() || null;
   let btn = null;
@@ -2445,9 +2478,13 @@ const CLAIM_JS = `(() => {
     if (summary) btn = Array.from(summary.querySelectorAll('button')).find((b) => /bonus|claim|abholen|einfordern/i.test(b.getAttribute('aria-label') || '')) || null;
   }
   if (!btn) btn = Array.from(document.querySelectorAll('button[aria-label]')).find((b) => /^(claim bonus|bonus abholen|bonus einfordern|bonus einlösen)$/i.test((b.getAttribute('aria-label') || '').trim())) || null;
-  if (btn && !btn.disabled) { btn.click(); r.claimed = true; }
+  if (btn && !btn.disabled) {
+    r.available = true;
+    if (${click}) { btn.click(); r.claimed = true; }
+  }
   return r;
 })()`;
+}
 
 let claimRunning = false;
 
@@ -2474,15 +2511,21 @@ async function claimPoints(): Promise<void> {
       }
     }
 
-    if (!state.settings.autoClaimPoints || !state.auth.loggedIn) return;
+    if (!state.auth.loggedIn) return;
+    const auto = state.settings.autoClaimPoints;
     for (const t of tabs.values()) {
       if (t.kind !== 'stream' || t.login === state.own?.login) continue;
       // Kompakt: Bonus-Knopf steckt im Chat; ganze Seite: im Chat-Bereich der Seite
       const target = t.chat ?? t.wv;
       if (!(t.chat ? t.chatReady : t.ready)) continue;
       try {
-        const r = (await target.executeJavaScript(CLAIM_JS)) as { claimed: boolean; balance: string | null } | null;
+        const r = (await target.executeJavaScript(claimJs(auto))) as { claimed: boolean; available: boolean; balance: string | null } | null;
         if (!r) continue;
+        const ready = r.available && !r.claimed;
+        if (ready !== t.bonusReady) {
+          t.bonusReady = ready;
+          renderClaimbar(t);
+        }
         if (r.balance && r.balance !== t.balance) {
           t.balance = r.balance;
           changed = true;
@@ -2499,6 +2542,50 @@ async function claimPoints(): Promise<void> {
     claimRunning = false;
     if (changed) renderTabBar();
   }
+}
+
+/** Bonus in diesem Stream jetzt abholen (Klick in der Abhol-Leiste) */
+async function claimBonusNow(t: Tab): Promise<void> {
+  const target = t.chat ?? t.wv;
+  try {
+    const r = (await target.executeJavaScript(claimJs(true))) as { claimed: boolean; balance: string | null } | null;
+    if (r?.claimed) {
+      t.claims++;
+      toast(`Bonus bei ${tabLabel(t)} abgeholt.`);
+    } else {
+      toast('Kein Bonus mehr da – vielleicht schon abgeholt.');
+    }
+  } catch {
+    toast('Bonus konnte nicht abgeholt werden – Chat lädt gerade.');
+  }
+  t.bonusReady = false;
+  renderClaimbar(t);
+  renderTabBar();
+}
+
+/** Leiste über Ton und Chat-Befehlen: zeigt nur, was es gerade abzuholen gibt. */
+function renderClaimbar(t: Tab): void {
+  const bar = t.cbar;
+  if (!bar || !bar.isConnected) return;
+  const items: Child[] = [];
+  if (t.bonusReady && !state?.settings.autoClaimPoints) {
+    items.push(h('button', { type: 'button', class: 'cb-btn cb-bonus', title: 'Kanalpunkte-Bonus in diesem Stream abholen', onclick: () => void claimBonusNow(t) },
+      icon('gift'), h('span', { text: 'Bonus abholen' })));
+  }
+  if (drops.ready && !state?.settings.autoClaimDrops) {
+    const names = drops.names.join(', ');
+    items.push(h('button', { type: 'button', class: 'cb-btn cb-drop', title: `Fertige Drops abholen: ${names}`, onclick: () => void claimDropsNow() },
+      icon('trophy'), h('span', { class: 'cb-label', text: drops.ready === 1 ? `Drop abholen: ${names}` : `${drops.ready} Drops abholen` })));
+  }
+  const key = JSON.stringify([t.bonusReady && !state?.settings.autoClaimPoints, drops.ready, drops.names, !!state?.settings.autoClaimDrops]);
+  if (bar.dataset.key === key) return;
+  bar.dataset.key = key;
+  bar.replaceChildren(...items.filter((x): x is HTMLElement => !!x));
+  bar.hidden = items.length === 0;
+}
+
+function renderClaimbars(): void {
+  for (const t of tabs.values()) renderClaimbar(t);
 }
 
 // ---------- Aufnahme (nur in Kanälen, in denen du Mod bist) ----------
@@ -2926,6 +3013,7 @@ function applyState(next: AppState): void {
   renderNotifs();
   if (notifOpen && !next.auth.loggedIn) toggleNotifs(false);
   syncDrops();
+  renderClaimbars();
 }
 
 async function main(): Promise<void> {

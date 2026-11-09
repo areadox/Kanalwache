@@ -17,12 +17,12 @@ Ein eigener Twitch-Viewer für Windows: dein Kanal und deine Lieblingskanäle an
 - Läuft im **Infobereich** weiter, wenn das Fenster geschlossen wird; Tray-Menü zeigt, wer gerade live ist
 - Optional **Autostart mit Windows** (startet versteckt im Infobereich)
 - **Giveaway-Helfer**: erkennt Giveaways in deinen Lieblingskanälen und lässt dich mit einem Klick teilnehmen, mit selbst festlegbaren Erkennungswörtern (siehe unten)
-- **Kanalpunkte**: holt den Bonus in offenen Streams automatisch ab und zeigt den Kontostand (siehe unten)
+- **Kanalpunkte**: zeigt den Kontostand und einen **Bonus abholen**-Knopf, sobald der Bonus bereitsteht (siehe unten)
 - **Favoriten** ★ in einer eigenen Leiste unter den Tabs, mit Alt+1–9 und Alt+←/→ schnell durchschalten (siehe unten)
 - **Gefolgte Kanäle übernehmen**: alle Kanäle, denen du folgst, mit einem Klick in die Liste – auf Wunsch laufend abgeglichen (siehe unten)
 - **Aufnahme**: Streams als Video aufnehmen – nur in Kanälen, in denen du Mod bist (siehe unten)
 - **Raids**: Raidet ein Kanal am Streamende, fragt Kanalwache mit einer Karte nach: mitraiden oder nicht (siehe unten)
-- **Drops**: zeigt dein Drop-Inventar, meldet fertige Drops und holt sie auf Wunsch automatisch ab (siehe unten)
+- **Drops**: zeigt dein Drop-Inventar, meldet fertige Drops und bietet einen **Drop abholen**-Knopf (siehe unten)
 - **Twitch-Benachrichtigungen**: die Meldungen aus Twitchs Glocke direkt in Kanalwache (siehe unten)
 - **Moderation**: erkennt, wo du Mod bist, und öffnet dort mit einem Klick Twitchs Mod-Ansicht – für deinen eigenen Kanal den Stream-Manager (siehe unten)
 
@@ -62,12 +62,12 @@ Dazu die Zahl, ab wie vielen Leuten (innerhalb von 30 Sekunden) ein Giveaway ohn
 
 ## Kanalpunkte
 
-In jedem offenen Stream-Tab schaut Kanalwache alle 15 Sekunden nach, ob der Bonus bereitsteht, und klickt ihn an – auch in Tabs im Hintergrund. Der aktuelle Kontostand steht im Tab (🪙); wurde in dieser Sitzung schon ein Bonus abgeholt, ist die Zahl farbig, der Tooltip zeigt wie oft.
+In jedem offenen Stream-Tab schaut Kanalwache alle 15 Sekunden nach, ob der Bonus bereitsteht. Ist er da, erscheint über der Schnellleiste (Ton, Chat-Befehle) eine **Abhol-Leiste** mit dem Knopf **Bonus abholen** – ein Klick, fertig. Die Leiste ist nur zu sehen, wenn es etwas abzuholen gibt. Der aktuelle Kontostand steht im Tab (🪙); wurde in dieser Sitzung schon ein Bonus abgeholt, ist die Zahl farbig, der Tooltip zeigt wie oft.
 
 - Funktioniert nur, wenn du angemeldet bist. Der Bonus wird im Chat neben dem Player abgeholt – auch wenn der Chat ausgeblendet ist.
 - Punkte gibt es nur für Streams, die in Kanalwache offen sind – am einfachsten mit dem Augen-Symbol (automatisch zuschauen). Dein eigener Kanal wird übersprungen.
-- Abschaltbar in den Einstellungen unter *Kanalpunkte*.
-- Twitch erlaubt automatisches Abholen nicht ausdrücklich; Browser-Erweiterungen machen dasselbe seit Jahren. Nutzung auf eigene Verantwortung.
+- **Automatisch abholen** gibt es weiterhin (Einstellungen → *Kanalpunkte*), ist aber **standardmäßig aus** – und wurde beim Update auf 0.0.11 einmalig ausgeschaltet.
+- **Warum aus?** Twitchs Nutzungsbedingungen verbieten, den Dienst „automatisiert“ zu nutzen („robot … or other automated means“). Automatisches Abholen von Bonus oder Drops fällt darunter. Bekannte Sperrwellen dafür gab es bisher nicht, erlaubt ist es trotzdem nicht – auf dem Spiel stünde dein Twitch-Konto. Der Abholen-Knopf (du klickst selbst) ist dagegen ganz normales Zuschauen.
 
 ### Kontostand und Belohnungen
 
@@ -93,7 +93,8 @@ Rechts in derselben Leiste stehen die Werkzeuge des aktiven Tabs (Zuschauer/Mod-
 Nach der Anmeldung gibt es oben neben *Giveaways* den Tab **Drops**. Er zeigt Twitchs Drop-Inventar (twitch.tv/drops/inventory) mit dem Fortschritt deiner laufenden Kampagnen.
 
 - Kanalwache prüft das Inventar im Hintergrund jede Minute (und lädt es alle 10 Minuten neu). Ist ein Drop fertig, steht die Zahl am Tab, oben in der Leiste steht, welcher es ist, und es kommt eine Meldung.
-- **Automatisch abholen** (Standard: an) klickt fertige Drops selbst ab – danach kommt „Drop abgeholt: …“. Ausgeschaltet holst du sie im Tab mit einem Klick auf Twitchs **Abholen**-Knopf.
+- Ist ein Drop fertig, erscheint in jedem offenen Stream über der Schnellleiste der Knopf **Drop abholen: …** – ein Klick holt ihn ab. Alternativ im Tab *Drops* mit Twitchs eigenem **Abholen**-Knopf.
+- **Automatisch abholen** (Standard: aus, gegen Twitchs Regeln – siehe *Kanalpunkte*) klickt fertige Drops selbst ab.
 - Fortschritt sammelst du wie auf Twitch: Stream eines Kanals mit aktiven Drops in Kanalwache schauen (angemeldet, Player läuft). Ob ein Spiel/Kampagne mit dem Konto verknüpft sein muss, siehst du im Inventar.
 - Einstellungen → *Drops*: Prüfung, automatisches Abholen und Windows-Meldungen einzeln abschaltbar.
 
