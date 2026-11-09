@@ -221,5 +221,6 @@ interface WebviewEl extends HTMLElement {
   getURL(): string;
   executeJavaScript(code: string): Promise<unknown>;
   loadURL(url: string): Promise<void>;
+  insertCSS(css: string): Promise<string>;
   getWebContentsId(): number;
 }

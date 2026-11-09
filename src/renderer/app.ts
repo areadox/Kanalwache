@@ -2309,6 +2309,13 @@ function dropsScanJs(click: boolean): string {
 }
 
 const DROPS_URL = 'https://www.twitch.tv/drops/inventory';
+const DROPS_CSS = `
+  nav.top-nav, [data-a-target="top-nav-container"], .top-nav__menu,
+  #side-nav, .side-nav, [data-a-target="side-nav-bar"], [data-a-target="side-nav-bar-collapsed"],
+  [data-test-selector="side-nav"] { display: none !important; }
+  .twilight-main, main, .root-scrollable, [data-a-target="root-scroller"] { margin-left: 0 !important; padding-left: 0 !important; }
+  body, html { overflow: auto !important; }
+`;
 let dropsWv: WebviewEl | null = null;
 let dropsReady = false;
 let dropsLoadedAt = 0;
@@ -2329,6 +2336,8 @@ function syncDrops(): void {
     dropsReady = false;
     dropsWv = createWebview(DROPS_URL, () => { /* erster Scan über den Takt */ });
     dropsWv.addEventListener('dom-ready', () => {
+      // Nur das Inventar zeigen: Twitchs obere Leiste und Seitenleiste ausblenden
+      if (/\/drops\//.test(dropsWv?.getURL() ?? '')) void dropsWv?.insertCSS(DROPS_CSS).catch(() => {});
       dropsReady = true;
       dropsLoadedAt = Date.now();
       // Seite braucht einen Moment, bis das Inventar gezeichnet ist
