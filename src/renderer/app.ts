@@ -316,6 +316,7 @@ function buildTabContent(t: Tab): void {
     t.chat = createWebview(chatUrl(login), (wv) => {
       if (t.chat === wv) t.chatReady = true;
     });
+    attachChatHistory(t, t.chat);
     t.view.className = 'view stream compact' + (t.id === activeId ? ' active' : '');
     t.view.replaceChildren(
       h('div', { class: 'player-pane' }, h('div', { class: 'player-stage' }, t.wv), (t.cbar = h('div', { class: 'claimbar', role: 'toolbar', 'aria-label': 'Abholen' })), (t.qbar = buildQuickbar(t))),
@@ -815,6 +816,198 @@ async function syncVolumes(): Promise<void> {
   }
 }
 
+// ---------- Chat-Verlauf (eigene Nachrichten) ----------
+
+/**
+ * Verlauf der eigenen Chat-Nachrichten – direkt in der Chateingabe von Twitch.
+ * chatHistoryUi wird per toString() in den Popout-Chat geschickt und darf nichts von außen benutzen.
+ * Rückmeldungen an Kanalwache laufen über console.log mit dem Präfix „__kw:“.
+ */
+function chatHistoryUi(initial: string[]): void {
+  const w = window as any;
+  if (w.__kwHistSet) { w.__kwHistSet(initial); return; }
+  let hist: string[] = initial;
+  let open = false;
+  let sel = 0;
+  const send = (kind: string, text?: string) => console.log('__kw:' + kind + ':' + JSON.stringify(text ?? ''));
+  const input = (): HTMLElement | null => document.querySelector('[data-a-target="chat-input"]');
+  const inputText = (el: HTMLElement) => ((el as HTMLTextAreaElement).value ?? el.innerText ?? '').replace(/ /g, ' ').trim();
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.title = 'Meine bisherigen Nachrichten (↑ im leeren Eingabefeld)';
+  btn.textContent = '↺';
+  Object.assign(btn.style, {
+    position: 'fixed', zIndex: '9999', width: '24px', height: '22px', padding: '0', border: '0', borderRadius: '6px 6px 0 0',
+    background: '#2f2f35', color: '#bf94ff', font: '600 14px/22px sans-serif', cursor: 'pointer', display: 'none',
+  });
+  const pop = document.createElement('div');
+  Object.assign(pop.style, {
+    position: 'fixed', zIndex: '10000', display: 'none', flexDirection: 'column', background: '#1f1f23', color: '#efeff1',
+    border: '1px solid #3a3a3d', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,.6)', font: '13px/1.35 sans-serif', overflow: 'hidden',
+  });
+  document.body.append(btn, pop);
+
+  const place = () => {
+    const el = input();
+    if (!el) { btn.style.display = 'none'; if (open) close(); return; }
+    const r = el.getBoundingClientRect();
+    if (!r.width) { btn.style.display = 'none'; return; }
+    btn.style.display = hist.length ? 'block' : 'none';
+    btn.style.left = `${Math.round(r.right - 30)}px`;
+    btn.style.top = `${Math.round(r.top - 22)}px`;
+    if (open) {
+      pop.style.left = `${Math.round(r.left)}px`;
+      pop.style.width = `${Math.round(r.width)}px`;
+      pop.style.bottom = `${Math.round(window.innerHeight - r.top + 4)}px`;
+      pop.style.maxHeight = `${Math.round(Math.max(120, r.top - 16))}px`;
+    }
+  };
+
+  const insert = (text: string) => {
+    const el = input();
+    if (!el) return;
+    el.focus();
+    // Vorhandenen Text ersetzen; execCommand geht durch Twitchs Editor wie Tippen
+    document.execCommand('selectAll', false);
+    document.execCommand('insertText', false, text);
+    if ((el as HTMLTextAreaElement).value !== undefined && (el as HTMLTextAreaElement).value !== text) {
+      const ta = el as HTMLTextAreaElement;
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+      setter?.call(ta, text);
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  };
+
+  const render = () => {
+    pop.replaceChildren();
+    const head = document.createElement('div');
+    Object.assign(head.style, { display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px', borderBottom: '1px solid #3a3a3d', color: '#adadb8', fontSize: '12px' });
+    const title = document.createElement('span');
+    title.textContent = 'Schon geschrieben – Klick sendet nochmal';
+    title.style.flex = '1';
+    const clear = document.createElement('button');
+    clear.type = 'button';
+    clear.textContent = 'Leeren';
+    Object.assign(clear.style, { background: 'none', border: '0', color: '#bf94ff', cursor: 'pointer', font: 'inherit' });
+    clear.onclick = () => { send('clear'); close(); };
+    head.append(title, clear);
+    const list = document.createElement('div');
+    Object.assign(list.style, { overflowY: 'auto', padding: '4px' });
+    hist.forEach((text, i) => {
+      const row = document.createElement('div');
+      Object.assign(row.style, { display: 'flex', alignItems: 'center', gap: '6px', borderRadius: '6px', background: i === sel ? '#3a3a3d' : 'transparent' });
+      const msg = document.createElement('button');
+      msg.type = 'button';
+      msg.textContent = text;
+      msg.title = 'Nochmal senden';
+      Object.assign(msg.style, { flex: '1', minWidth: '0', textAlign: 'left', background: 'none', border: '0', color: 'inherit', font: 'inherit', padding: '6px 8px', cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' });
+      msg.onclick = () => { send('resend', text); close(); };
+      const edit = document.createElement('button');
+      edit.type = 'button';
+      edit.textContent = '✎';
+      edit.title = 'In die Eingabe übernehmen und ändern';
+      Object.assign(edit.style, { flex: 'none', background: 'none', border: '0', color: '#adadb8', cursor: 'pointer', font: '14px sans-serif', padding: '4px 8px' });
+      edit.onclick = () => { close(); insert(text); };
+      row.onmouseenter = () => { sel = i; for (const [j, c] of Array.from(list.children).entries()) (c as HTMLElement).style.background = j === sel ? '#3a3a3d' : 'transparent'; };
+      row.append(msg, edit);
+      list.append(row);
+    });
+    pop.append(head, list);
+    (list.children[sel] as HTMLElement | undefined)?.scrollIntoView({ block: 'nearest' });
+  };
+
+  const show = () => { if (!hist.length) return; open = true; sel = 0; pop.style.display = 'flex'; place(); render(); };
+  function close() { open = false; pop.style.display = 'none'; }
+
+  btn.addEventListener('mousedown', (e) => e.preventDefault());
+  btn.addEventListener('click', () => (open ? close() : show()));
+  document.addEventListener('mousedown', (e) => { if (open && !pop.contains(e.target as Node) && e.target !== btn) close(); }, true);
+
+  document.addEventListener('keydown', (e) => {
+    const el = input();
+    const inInput = !!el && el.contains(e.target as Node);
+    if (open && inInput) {
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        e.preventDefault(); e.stopPropagation();
+        sel = (sel + (e.key === 'ArrowDown' ? -1 : 1) + hist.length) % hist.length;
+        if (e.key === 'ArrowDown' && sel === hist.length - 1) { close(); return; }
+        render();
+        return;
+      }
+      if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); const t = hist[sel]; close(); if (t) send('resend', t); return; }
+      if (e.key === 'Tab' || e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); const t = hist[sel]; close(); if (t) insert(t); return; }
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); return; }
+      close();
+    }
+    if (!inInput || !el) return;
+    if (e.key === 'ArrowUp' && !inputText(el) && hist.length) { e.preventDefault(); e.stopPropagation(); show(); return; }
+    // Gesendete Nachricht merken (Enter ohne Umschalt)
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+      const text = inputText(el);
+      if (text) send('sent', text);
+    }
+  }, true);
+  document.addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest?.('[data-a-target="chat-send-button"]');
+    const el = input();
+    if (b && el) { const text = inputText(el); if (text) send('sent', text); }
+  }, true);
+
+  w.__kwHistSet = (list: string[]) => { hist = list; if (open) { if (!hist.length) close(); else { sel = Math.min(sel, hist.length - 1); render(); } } place(); };
+  setInterval(place, 700);
+  window.addEventListener('resize', place);
+  place();
+}
+
+const HIST_MAX = 50;
+let chatHistory: string[] = (() => {
+  try {
+    const v = JSON.parse(localStorage.getItem('kw.chatHistory') ?? '[]');
+    return Array.isArray(v) ? v.filter((x) => typeof x === 'string').slice(0, HIST_MAX) : [];
+  } catch { return []; }
+})();
+
+function rememberChat(text: string): void {
+  const t = text.trim();
+  if (!t) return;
+  chatHistory = [t, ...chatHistory.filter((x) => x !== t)].slice(0, HIST_MAX);
+  saveChatHistory();
+}
+
+function saveChatHistory(): void {
+  try { localStorage.setItem('kw.chatHistory', JSON.stringify(chatHistory)); } catch { /* egal */ }
+  for (const t of tabs.values()) {
+    if (t.chat && t.chatReady) void t.chat.executeJavaScript(`window.__kwHistSet && window.__kwHistSet(${JSON.stringify(chatHistory)})`).catch(() => {});
+  }
+}
+
+/** Verlauf in den Popout-Chat eines Tabs einbauen und dessen Rückmeldungen annehmen */
+function attachChatHistory(t: Tab, wv: WebviewEl): void {
+  wv.addEventListener('dom-ready', () => {
+    if (!/\/popout\/[^/]+\/chat/.test(wv.getURL())) return;
+    void wv.executeJavaScript(`(${chatHistoryUi.toString()})(${JSON.stringify(chatHistory)})`).catch(() => {});
+  });
+  wv.addEventListener('console-message', (e: Event) => {
+    const msg = String((e as unknown as { message?: string }).message ?? '');
+    const m = msg.match(/^__kw:(sent|resend|clear):(.*)$/s);
+    if (!m) return;
+    let text = '';
+    try { text = JSON.parse(m[2]); } catch { return; }
+    if (m[1] === 'clear') { chatHistory = []; saveChatHistory(); toast('Chat-Verlauf geleert.'); return; }
+    if (m[1] === 'sent') { rememberChat(text); return; }
+    void resendChat(t, text);
+  });
+}
+
+async function resendChat(t: Tab, text: string): Promise<void> {
+  if (!t.login) return;
+  if (!state?.auth.loggedIn) { toast('Zum Schreiben im Chat musst du bei Twitch angemeldet sein.'); return; }
+  const r = await api.chatSend(t.login, text);
+  if (r.ok) rememberChat(text);
+  else toast(r.error ?? 'Senden ging nicht.');
+}
+
 async function sendQuick(t: Tab, m: QuickMessage, btn: HTMLButtonElement): Promise<void> {
   if (!t.login || btn.classList.contains('sending')) return;
   if (!state?.auth.loggedIn) {
@@ -822,9 +1015,11 @@ async function sendQuick(t: Tab, m: QuickMessage, btn: HTMLButtonElement): Promi
     return;
   }
   btn.classList.add('sending');
-  const r = await api.chatSend(t.login, expandMessage(m.text, t));
+  const text = expandMessage(m.text, t);
+  const r = await api.chatSend(t.login, text);
   btn.classList.remove('sending');
   if (r.ok) {
+    rememberChat(text);
     btn.classList.add('sent');
     setTimeout(() => btn.classList.remove('sent'), 1400);
   } else {

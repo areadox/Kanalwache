@@ -108,6 +108,16 @@ Nach der Anmeldung holt Kanalwache alle 2 Minuten die Benachrichtigungen deines 
 - Einstellungen → *Twitch-Benachrichtigungen*: Abruf ein/aus und, wenn du willst, neue zusätzlich als **Windows-Meldung** (standardmäßig aus, weil Kanalwache bei Live-Gängen schon selbst meldet).
 - Twitch dokumentiert diese Schnittstelle nicht. Ändert Twitch etwas daran, steht in der Liste ein Hinweis – über **Auf twitch.tv** siehst du die Benachrichtigungen dann im Browser.
 
+## Chat-Verlauf
+
+Was du im Chat schreibst, merkt sich Kanalwache (die letzten 50 Nachrichten, über alle Kanäle). So schreibst du etwas nochmal, ohne es neu zu tippen:
+
+- **↑** im leeren Eingabefeld des Chats – oder der kleine **↺**-Knopf oben rechts am Eingabefeld – öffnet die Liste, die neueste Nachricht steht oben.
+- **Klick** auf eine Nachricht (oder **↑/↓** und **Enter**) sendet sie sofort nochmal in diesen Chat.
+- **✎** (oder **Tab**/**→**) übernimmt sie ins Eingabefeld, damit du sie vorher ändern kannst. **Esc** schließt die Liste.
+- **Leeren** löscht den Verlauf. Nachrichten über die Schnellleiste landen ebenfalls im Verlauf.
+- Gilt für die Stream-Ansicht (Player + Chat). Der Verlauf liegt nur auf deinem PC.
+
 ## Schnellleiste unter dem Player
 
 Unter jedem Stream (in der Ansicht „nur Player und Chat“) liegt eine Leiste mit:
