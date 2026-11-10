@@ -48,6 +48,7 @@ const ICONS = {
   record: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5" fill="currentColor"/></svg>',
   star: '<svg viewBox="0 0 24 24"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9L12 3.5Z"/></svg>',
   sword: '<svg viewBox="0 0 24 24"><path d="M14.5 17.5 3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2"/></svg>',
+  heart: '<svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10Z"/></svg>',
   home: '<svg viewBox="0 0 24 24"><path d="M4 11 12 4l8 7v9h-5v-6H9v6H4v-9Z"/></svg>',
 };
 
@@ -1029,6 +1030,137 @@ async function sendQuick(t: Tab, m: QuickMessage, btn: HTMLButtonElement): Promi
   }
 }
 
+// ---------- Folgen / Abonnieren ----------
+
+const relations = new Map<string, { rel: ChannelRelation | null; at: number; busy: boolean }>();
+
+function relButtons(t: Tab): HTMLElement | null {
+  if (!t.login || !state?.auth.loggedIn || t.login === state.own?.login) return null;
+  const box = h('div', { class: 'qb-rel', 'data-login': t.login });
+  fillRel(box, t.login);
+  const r = relations.get(t.login);
+  if (!r || Date.now() - r.at > 5 * 60_000) void loadRelation(t.login);
+  return box;
+}
+
+function fillRel(box: HTMLElement, login: string): void {
+  const r = relations.get(login);
+  const rel = r?.rel ?? null;
+  const name = nameOf(login);
+  const following = rel?.following === true;
+  const follow = h('button', {
+    type: 'button', class: `qb-follow${following ? ' is-on' : ''}`, disabled: !!r?.busy,
+    title: following ? `Du folgst ${name} – klicken zum Entfolgen` : `${name} folgen`,
+    onclick: () => void toggleFollow(login),
+  }, icon('heart'), h('span', { text: r?.busy ? '…' : following ? 'Gefolgt' : 'Folgen' }));
+  const tier = rel?.subTier ? ` (Stufe ${String(rel.subTier).replace(/000$/, '')})` : '';
+  const sub = h('button', {
+    type: 'button', class: `qb-sub${rel?.subTier ? ' is-on' : ''}`,
+    title: rel?.subTier ? `Du hast ${name} abonniert${tier} – Abo verwalten oder verschenken` : `${name} abonnieren oder ein Abo verschenken`,
+    onclick: () => openSubDialog(login),
+  }, icon('star'), h('span', { text: rel?.subTier ? `Abonniert${tier}` : 'Abonnieren' }));
+  box.replaceChildren(follow, sub);
+}
+
+function renderRel(login: string): void {
+  for (const box of document.querySelectorAll<HTMLElement>(`.qb-rel[data-login="${login}"]`)) fillRel(box, login);
+}
+
+async function loadRelation(login: string): Promise<void> {
+  const cur = relations.get(login);
+  relations.set(login, { rel: cur?.rel ?? null, at: Date.now(), busy: cur?.busy ?? false });
+  const rel = await api.relation(login);
+  const now = relations.get(login);
+  relations.set(login, { rel: rel ?? now?.rel ?? null, at: Date.now(), busy: now?.busy ?? false });
+  renderRel(login);
+}
+
+async function toggleFollow(login: string): Promise<void> {
+  const r = relations.get(login);
+  if (r?.busy) return;
+  const rel = r?.rel ?? (await api.relation(login));
+  const want = !(rel?.following === true);
+  if (!want && !confirm(`${nameOf(login)} wirklich entfolgen?`)) return;
+  relations.set(login, { rel, at: Date.now(), busy: true });
+  renderRel(login);
+  let ok = false;
+  if (rel?.id) {
+    const res = await api.setFollow(rel.id, want);
+    ok = res.ok;
+  }
+  // Twitch lehnt die Schnittstelle ab → Knopf auf der Kanalseite drücken
+  if (!ok) ok = await followViaPage(login, want);
+  relations.set(login, { rel: rel ? { ...rel, following: ok ? want : rel.following } : null, at: 0, busy: false });
+  renderRel(login);
+  toast(ok ? (want ? `Du folgst jetzt ${nameOf(login)}.` : `Du folgst ${nameOf(login)} nicht mehr.`) : 'Folgen hat nicht geklappt – versuch es auf der Kanalseite.');
+  // Kurz danach den echten Stand holen
+  setTimeout(() => void loadRelation(login), 3000);
+}
+
+/** Lädt die Kanalseite unsichtbar und drückt dort Twitchs Folgen-/Entfolgen-Knopf. */
+function followViaPage(login: string, follow: boolean): Promise<boolean> {
+  return new Promise((resolve) => {
+    const wv = document.createElement('webview') as WebviewEl;
+    wv.className = 'offscreen-wv';
+    wv.setAttribute('src', `https://www.twitch.tv/${login}`);
+    wv.setAttribute('partition', 'persist:twitch');
+    let done = false;
+    const finish = (ok: boolean) => {
+      if (done) return;
+      done = true;
+      clearInterval(timer);
+      setTimeout(() => wv.remove(), 500);
+      resolve(ok);
+    };
+    const js = `(() => {
+      const q = (s) => document.querySelector(s);
+      if (${follow}) {
+        if (q('[data-a-target="unfollow-button"]')) return 'done';
+        const b = q('[data-a-target="follow-button"]');
+        if (b) { b.click(); return 'clicked'; }
+      } else {
+        const m = q('[data-a-target="modal-unfollow-button"]');
+        if (m) { m.click(); return 'clicked'; }
+        if (q('[data-a-target="follow-button"]')) return 'done';
+        const b = q('[data-a-target="unfollow-button"]');
+        if (b) { b.click(); return 'pending'; }
+      }
+      return 'wait';
+    })()`;
+    let clicked = false;
+    const started = Date.now();
+    const timer = window.setInterval(() => {
+      if (Date.now() - started > 20_000) { finish(false); return; }
+      wv.executeJavaScript(js).then((r: unknown) => {
+        if (r === 'done') finish(true);
+        else if (r === 'clicked') clicked = true;
+      }).catch(() => {});
+    }, 700);
+    document.body.append(wv);
+  });
+}
+
+function openSubDialog(login: string): void {
+  document.getElementById('sub-dialog')?.remove();
+  const close = () => {
+    dlg.remove();
+    setTimeout(() => void loadRelation(login), 1500);
+  };
+  const wv = createWebview(`https://www.twitch.tv/subs/${login}`, () => {});
+  const dlg = h('div', { id: 'sub-dialog', class: 'sub-dialog', onclick: (e: MouseEvent) => { if (e.target === dlg) close(); } },
+    h('div', { class: 'sub-box' },
+      h('div', { class: 'sub-head' },
+        icon('star'),
+        h('strong', { text: `${nameOf(login)} abonnieren` }),
+        h('span', { class: 'muted', text: 'Abo abschließen, verlängern oder verschenken – direkt bei Twitch' }),
+        iconButton('external', 'Im Browser öffnen', () => void api.openExternal(`https://www.twitch.tv/subs/${login}`)),
+        iconButton('close', 'Schließen (Esc)', close)),
+      h('div', { class: 'sub-stage' }, wv)));
+  const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { document.removeEventListener('keydown', onKey); close(); } };
+  document.addEventListener('keydown', onKey);
+  document.body.append(dlg);
+}
+
 function buildQuickbar(t: Tab): HTMLElement {
   const bar = h('div', { class: 'quickbar', role: 'toolbar', 'aria-label': 'Schnellleiste' });
   fillQuickbar(t, bar);
@@ -1049,6 +1181,7 @@ function fillQuickbar(t: Tab, bar: HTMLElement): void {
       onclick: () => toggleMute(t),
     }, icon(muted ? 'mute' : 'volume'), h('span', { text: muted ? 'Stumm' : 'Ton an' })),
     vol,
+    relButtons(t) ?? '',
     h('span', { class: 'qb-sep' }),
     h('div', { class: 'qb-msgs' },
       ...messages.map((m) => {

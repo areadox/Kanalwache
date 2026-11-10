@@ -125,6 +125,13 @@ interface AppState {
   notifs: { list: TwitchNotification[]; error: string | null; loading: boolean; at: number | null; unread: number; seenAt: number };
 }
 
+interface ChannelRelation {
+  login: string;
+  id: string | null;
+  following: boolean | null;
+  subTier: string | null | undefined;
+}
+
 interface TwitchNotification {
   id: string;
   text: string;
@@ -174,6 +181,8 @@ interface KanalwacheApi {
   logout(): Promise<void>;
   openExternal(url: string): Promise<void>;
   notifsRefresh(): Promise<void>;
+  relation(login: string): Promise<ChannelRelation | null>;
+  setFollow(id: string, follow: boolean): Promise<{ ok: boolean; fallback?: boolean; error?: string }>;
   dropsNotify(title: string, body: string): Promise<void>;
   notifsSeen(): Promise<void>;
   notifsOpen(id: string): Promise<void>;

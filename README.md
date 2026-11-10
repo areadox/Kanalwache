@@ -123,6 +123,8 @@ Was du im Chat schreibst, merkt sich Kanalwache (die letzten 50 Nachrichten, üb
 Unter jedem Stream (in der Ansicht „nur Player und Chat“) liegt eine Leiste mit:
 
 - **Ton an / Stumm** – wie Strg+M, schaltet sofort um; bei „Ton nur aus einem Tab“ holt der Knopf an einem stummen Tab den Ton hierher.
+- **Folgen / Gefolgt** – folgt dem Kanal mit einem Klick; steht dort „Gefolgt“, entfolgt ein Klick (mit Rückfrage). Lehnt Twitch das direkte Folgen ab, drückt Kanalwache unsichtbar den Folgen-Knopf auf der Kanalseite.
+- **Abonnieren** – öffnet Twitchs Abo-Seite des Kanals in einem Fenster in Kanalwache (angemeldet): Abo abschließen, verlängern oder verschenken; bezahlt wird direkt bei Twitch. Hast du schon ein Abo, steht dort „Abonniert (Stufe …)“. Bei deinem eigenen Kanal fehlen beide Knöpfe.
 - **Lautstärkeregler** – eine gemeinsame Lautstärke für alle Streams, die gemerkt wird. Kanalwache hält sie in jedem Player gleich, auch wenn Twitch die Lautstärke nach Werbung oder beim Neuladen zurücksetzt. Bewegst du im aktiven Stream Twitchs eigenen Regler, wird das die neue gemeinsame Lautstärke; Twitchs Stumm-Knopf schaltet wie Strg+M um.
 - **Schnellnachrichten** – ein Klick schreibt die Nachricht mit deinem Account in den Chat des Kanals. Der Knopf wird kurz grün, wenn Twitch die Nachricht angenommen hat; lehnt Twitch ab (z. B. Follower-only, Slow-Mode, Timeout), steht der Grund in der Meldung.
 - **Stift** – Schnellnachrichten bearbeiten (auch unter Einstellungen → *Schnellleiste*): Beschriftung und Text, Reihenfolge, bis zu 20 Stück. Platzhalter: `{kanal}` = Name des Kanals, `{ich}` = dein Name. Befehle wie `!lurk` gehen, Twitch-Befehle mit `/` nicht.

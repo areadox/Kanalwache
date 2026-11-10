@@ -6,6 +6,7 @@ import * as path from 'node:path';
 import { clampPoll, normalizeLogin, sanitizeQuickMessages, Settings, Store } from './store';
 import { ChannelStatus, fetchFollows, fetchModChannels, fetchStatuses, FollowedChannel } from './twitch';
 import { fetchTwitchNotifications, TwitchNotification } from './notifications';
+import { fetchRelation, setFollow } from './relation';
 import { TwitchChat } from './chat';
 import { analyzeAnnouncement, ENTRY_RE, Giveaway, GiveawayDetector } from './giveaway';
 import { compileRules, CompiledRules, DEFAULT_RULES, sanitizeRules } from './rules';
@@ -1090,6 +1091,19 @@ function registerIpc(): void {
       win?.webContents.send('shortcut', 'drops');
     });
     n.show();
+  });
+
+  ipcMain.handle('relation', async (_e, login: unknown) => {
+    if (typeof login !== 'string' || !/^[a-z0-9_]{2,25}$/.test(login) || !authToken) return null;
+    try {
+      return await fetchRelation(authToken, login);
+    } catch {
+      return null;
+    }
+  });
+  ipcMain.handle('set-follow', async (_e, id: unknown, follow: unknown) => {
+    if (typeof id !== 'string' || !/^\d+$/.test(id) || typeof follow !== 'boolean' || !authToken) return { ok: false, fallback: true };
+    return setFollow(authToken, id, follow);
   });
 
   ipcMain.handle('notifs-refresh', () => refreshNotifs());
