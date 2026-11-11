@@ -48,6 +48,7 @@ const ICONS = {
   record: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5" fill="currentColor"/></svg>',
   star: '<svg viewBox="0 0 24 24"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9L12 3.5Z"/></svg>',
   sword: '<svg viewBox="0 0 24 24"><path d="M14.5 17.5 3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2"/></svg>',
+  flame: '<svg viewBox="0 0 24 24"><path d="M12 21c-4 0-7-2.8-7-6.6 0-3.1 2-5.2 3.6-6.9.4 1.8 1.4 3 2.6 3.5C11 7.6 12.4 5 15 3c-.2 2.7.7 4.4 2 6 1.2 1.5 2 3.1 2 5.2 0 3.9-3 6.8-7 6.8Z"/></svg>',
   heart: '<svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10Z"/></svg>',
   home: '<svg viewBox="0 0 24 24"><path d="M4 11 12 4l8 7v9h-5v-6H9v6H4v-9Z"/></svg>',
 };
@@ -1028,6 +1029,17 @@ async function sendQuick(t: Tab, m: QuickMessage, btn: HTMLButtonElement): Promi
     setTimeout(() => btn.classList.remove('failed'), 1600);
     toast(r.error ?? 'Senden ging nicht.');
   }
+}
+
+// ---------- Zuschauerserie ----------
+
+function streakBadge(login: string): HTMLElement | null {
+  const n = state?.settings.showStreaks ? state.streaks?.[login] : undefined;
+  if (!n) return null;
+  return h('span', {
+    class: `cn-streak${n >= 5 ? ' hot' : ''}`,
+    title: `Zuschauerserie: ${n} Stream${n === 1 ? '' : 's'} in Folge geschaut`,
+  }, icon('flame'), h('span', { text: String(n) }));
 }
 
 // ---------- Folgen / Abonnieren ----------
@@ -2077,7 +2089,8 @@ function channelRow(c: ChannelView, opts: { own: boolean; index?: number; count?
     h('div', { class: 'channel-text' },
       h('span', { class: 'channel-name' },
         h('span', { class: 'cn-text', text: displayName(c) }),
-        isStarred(c.login) ? h('span', { class: 'cn-star', title: 'Favorit' }, icon('star')) : null),
+        isStarred(c.login) ? h('span', { class: 'cn-star', title: 'Favorit' }, icon('star')) : null,
+        streakBadge(c.login)),
       h('span', { class: 'channel-sub' },
         isMod(c.login) ? h('span', { class: 'mod-badge', title: 'Du bist hier Moderator' }, icon('shield'), 'Mod') : null,
         isMod(c.login) ? ' · ' : null,

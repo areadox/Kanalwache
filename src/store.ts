@@ -52,6 +52,8 @@ export interface Settings {
   dropsCheck: boolean;
   autoClaimDrops: boolean;
   dropsNotify: boolean;
+  /** Zuschauerserie („Watch Streak“) an den Kanälen anzeigen */
+  showStreaks: boolean;
 }
 
 export interface QuickMessage {
@@ -125,6 +127,7 @@ export const DEFAULT_SETTINGS: Settings = {
   dropsCheck: true,
   autoClaimDrops: false,
   dropsNotify: true,
+  showStreaks: true,
 };
 
 const LOGIN_RE = /^[a-z0-9_]{2,25}$/;

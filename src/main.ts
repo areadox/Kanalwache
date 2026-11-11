@@ -7,6 +7,7 @@ import { clampPoll, normalizeLogin, sanitizeQuickMessages, Settings, Store } fro
 import { ChannelStatus, fetchFollows, fetchModChannels, fetchStatuses, FollowedChannel } from './twitch';
 import { fetchTwitchNotifications, TwitchNotification } from './notifications';
 import { fetchRelation, setFollow } from './relation';
+import { fetchStreaks } from './streaks';
 import { TwitchChat } from './chat';
 import { analyzeAnnouncement, ENTRY_RE, Giveaway, GiveawayDetector } from './giveaway';
 import { compileRules, CompiledRules, DEFAULT_RULES, sanitizeRules } from './rules';
@@ -189,6 +190,36 @@ async function refreshNotifs(): Promise<void> {
 function openNotif(n: TwitchNotification): void {
   if (n.login) openChannel(n.login, false);
   else if (n.url) void shell.openExternal(n.url);
+}
+
+// ---------- Zuschauerserien ----------
+
+const streaks = new Map<string, number>();
+let streakTimer: NodeJS.Timeout | null = null;
+let streakRunning = false;
+
+async function refreshStreaks(): Promise<void> {
+  if (streakTimer) clearTimeout(streakTimer);
+  streakTimer = setTimeout(() => void refreshStreaks(), 20 * 60_000);
+  if (!authToken || streakRunning || !store.config.settings.showStreaks) {
+    if (streaks.size && (!authToken || !store.config.settings.showStreaks)) { streaks.clear(); pushState(); }
+    return;
+  }
+  streakRunning = true;
+  try {
+    const own = store.config.own?.login;
+    const logins = store.allLogins().filter((l) => l !== own);
+    const res = await fetchStreaks(authToken, logins);
+    for (const [login, s] of res) {
+      if (s && s.count >= 1) streaks.set(login, s.count);
+      else streaks.delete(login);
+    }
+    pushState();
+  } catch {
+    /* nächster Versuch beim nächsten Takt */
+  } finally {
+    streakRunning = false;
+  }
 }
 
 async function refreshMods(): Promise<void> {
@@ -711,6 +742,7 @@ async function refreshAuth(): Promise<void> {
     void syncFollows();
     notifKnown = null;
     void refreshNotifs();
+    void refreshStreaks();
   }
 }
 
@@ -822,6 +854,7 @@ function buildState() {
     defaultRules: DEFAULT_RULES,
     chat: { connected: chat.connected, canSend: chat.canSend, authProblem: chat.authProblem },
     notifs: { ...notifs, unread: notifUnread(), seenAt: store.config.notifSeenAt },
+    streaks: Object.fromEntries(streaks),
   };
 }
 
@@ -939,7 +972,7 @@ function registerIpc(): void {
     if (!patch || typeof patch !== 'object') return;
     const p = patch as Partial<Settings>;
     const s = store.config.settings;
-    for (const key of ['closeToTray', 'startInTray', 'autostart', 'muteAutoOpened', 'closeTabWhenOffline', 'giveawayHelper', 'giveawayNotify', 'autoClaimPoints', 'syncFollows', 'followNotify', 'followAutoOpen', 'fullPage', 'singleAudio', 'showFavBar', 'raidPrompt', 'autoUpdate', 'twitchNotifs', 'twitchNotifPopup', 'dropsCheck', 'autoClaimDrops', 'dropsNotify'] as const) {
+    for (const key of ['closeToTray', 'startInTray', 'autostart', 'muteAutoOpened', 'closeTabWhenOffline', 'giveawayHelper', 'giveawayNotify', 'autoClaimPoints', 'syncFollows', 'followNotify', 'followAutoOpen', 'fullPage', 'singleAudio', 'showFavBar', 'raidPrompt', 'autoUpdate', 'twitchNotifs', 'twitchNotifPopup', 'dropsCheck', 'autoClaimDrops', 'dropsNotify', 'showStreaks'] as const) {
       if (typeof p[key] === 'boolean') s[key] = p[key] as boolean;
     }
     if (typeof p.pollSeconds === 'number') s.pollSeconds = clampPoll(p.pollSeconds);
@@ -948,6 +981,7 @@ function registerIpc(): void {
     if (p.syncFollows === true) void syncFollows();
     if (typeof p.autoUpdate === 'boolean') updater.setAuto(p.autoUpdate);
     if (typeof p.twitchNotifs === 'boolean') void refreshNotifs();
+    if (typeof p.showStreaks === 'boolean') void refreshStreaks();
     syncChat();
     saveAndPush(typeof p.pollSeconds === 'number');
   });

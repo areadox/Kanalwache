@@ -44,6 +44,7 @@ interface AppSettings {
   dropsCheck: boolean;
   autoClaimDrops: boolean;
   dropsNotify: boolean;
+  showStreaks: boolean;
 }
 
 interface QuickMessage {
@@ -122,6 +123,7 @@ interface AppState {
   /** Dein eigener Kanal, wenn du mit diesem Account angemeldet bist */
   broadcaster: string | null;
   update: { state: UpdateState; version: string; portable: boolean; supported: boolean };
+  streaks: Record<string, number>;
   notifs: { list: TwitchNotification[]; error: string | null; loading: boolean; at: number | null; unread: number; seenAt: number };
 }
 
