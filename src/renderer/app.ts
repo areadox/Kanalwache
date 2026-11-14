@@ -3503,6 +3503,55 @@ function setupSettings(): void {
   document.getElementById('btn-settings')!.addEventListener('click', () => {
     syncSettingsForm();
     dialog.showModal();
+    document.getElementById('st-content')!.scrollTop = 0;
+    (dialog.querySelector('.st-nav-btn') as HTMLElement | null)?.classList.add('active');
+    for (const b of dialog.querySelectorAll('.st-nav-btn')) b.classList.toggle('active', b === dialog.querySelector('.st-nav-btn'));
+  });
+  // Symbole, Navigation links, Suche
+  for (const el of dialog.querySelectorAll<HTMLElement>('.st-ico[data-icon]')) el.replaceChildren(icon(el.dataset.icon as keyof typeof ICONS));
+  document.getElementById('st-close')!.replaceChildren(icon('close'));
+  const content = document.getElementById('st-content')!;
+  const navBtns = [...dialog.querySelectorAll<HTMLButtonElement>('.st-nav-btn')];
+  for (const b of navBtns) {
+    b.addEventListener('click', () => {
+      const sec = document.getElementById(b.dataset.sec!);
+      if (sec) content.scrollTo({ top: sec.offsetTop - content.offsetTop - 8, behavior: 'smooth' });
+    });
+  }
+  const spy = () => {
+    const top = content.scrollTop + 40;
+    let cur = navBtns[0];
+    for (const b of navBtns) {
+      const sec = document.getElementById(b.dataset.sec!);
+      if (sec && !sec.hidden && sec.offsetTop - content.offsetTop <= top) cur = b;
+    }
+    if (content.scrollTop + content.clientHeight >= content.scrollHeight - 4) cur = [...navBtns].reverse().find((b) => !document.getElementById(b.dataset.sec!)?.hidden) ?? cur;
+    for (const b of navBtns) b.classList.toggle('active', b === cur);
+  };
+  content.addEventListener('scroll', spy, { passive: true });
+  const search = document.getElementById('st-search') as HTMLInputElement;
+  search.addEventListener('input', () => {
+    const q = search.value.trim().toLowerCase();
+    let any = false;
+    for (const sec of dialog.querySelectorAll<HTMLElement>('.st-sec')) {
+      const secHit = !q || (sec.dataset.title ?? '').toLowerCase().includes(q);
+      let visible = 0;
+      for (const row of sec.querySelectorAll<HTMLElement>('.st-row, .st-warn, .settings-account')) {
+        const hit = secHit || (row.textContent ?? '').toLowerCase().includes(q);
+        row.hidden = !hit;
+        if (hit) visible++;
+      }
+      sec.hidden = visible === 0;
+      if (visible) any = true;
+      const btn = navBtns.find((b) => b.dataset.sec === sec.id);
+      if (btn) btn.hidden = sec.hidden;
+    }
+    document.getElementById('st-empty')!.hidden = any;
+    content.scrollTop = 0;
+    spy();
+  });
+  dialog.addEventListener('close', () => {
+    if (search.value) { search.value = ''; search.dispatchEvent(new Event('input')); }
   });
   for (const el of dialog.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-setting]')) {
     el.addEventListener('change', () => {
@@ -3525,8 +3574,10 @@ function syncSettingsForm(): void {
   }
   const acc = document.getElementById('settings-account')!;
   acc.replaceChildren(
-    h('div', { class: 'row' },
-      h('span', { text: state.own ? `Eigener Kanal: ${displayName(state.own)}` : 'Kein eigener Kanal festgelegt' }),
+    h('div', { class: 'st-row' },
+      h('span', { class: 'st-text' },
+        h('span', { class: 'st-title', text: 'Eigener Kanal' }),
+        h('span', { class: 'st-desc', text: state.own ? displayName(state.own) : 'Noch nicht festgelegt' })),
       state.own
         ? h('button', { class: 'btn small', type: 'button', text: 'Ändern', onclick: async () => {
             const next = prompt('Neuer Kanalname (leer lassen zum Entfernen):', state!.own!.login);
@@ -3536,8 +3587,10 @@ function syncSettingsForm(): void {
             syncSettingsForm();
           } })
         : null),
-    h('div', { class: 'row' },
-      h('span', { text: state.auth.loggedIn ? `Twitch: angemeldet als ${state.auth.user ?? '?'}` : 'Twitch: nicht angemeldet' }),
+    h('div', { class: 'st-row' },
+      h('span', { class: 'st-text' },
+        h('span', { class: 'st-title', text: 'Twitch-Konto' }),
+        h('span', { class: 'st-desc', text: state.auth.loggedIn ? `Angemeldet als ${state.auth.user ?? '?'}` : 'Nicht angemeldet' })),
       state.auth.loggedIn
         ? h('button', { class: 'btn small danger', type: 'button', text: 'Abmelden', onclick: async () => {
             if (!confirm('Bei Twitch abmelden? Offene Streams laufen dann ohne deinen Account weiter.')) return;

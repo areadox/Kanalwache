@@ -84,71 +84,123 @@
     </div>
   </main>
 
-  <dialog id="settings">
-    <form method="dialog" class="settings">
-      <h2>Einstellungen</h2>
-      <h3>Giveaway-Helfer</h3>
-      <label class="row"><input type="checkbox" data-setting="giveawayHelper"> Chat der Live-Kanäle mitlesen und Giveaways erkennen</label>
-      <label class="row"><input type="checkbox" data-setting="giveawayNotify"> Benachrichtigen, wenn ein Giveaway startet</label>
-      <div class="row"><button type="button" class="btn small" id="btn-rules">Erkennungswörter bearbeiten …</button></div>
-      <h3>Schnellleiste</h3>
-      <div class="row"><button type="button" class="btn small" id="btn-quick">Schnellnachrichten bearbeiten …</button></div>
-      <h3>Aufnahmen</h3>
-      <p class="muted rule-hint">Nur in Kanälen verfügbar, in denen du Mod bist – über den Knopf „Aufnehmen“ oben rechts im Stream-Tab.</p>
-      <div class="row rec-dir-row"><span class="muted">Ordner:</span> <span id="rec-dir" class="rec-dir"></span>
-        <button type="button" class="btn small" id="btn-rec-dir">Ändern …</button>
-        <button type="button" class="btn small" id="btn-rec-open">Öffnen</button></div>
-      <label class="row select">Qualität
-        <select data-setting="recordQuality">
-          <option value="high">Hoch (8 Mbit/s, ca. 3,6 GB pro Stunde)</option>
-          <option value="medium">Mittel (5 Mbit/s, ca. 2,3 GB pro Stunde)</option>
-          <option value="low">Niedrig (2,5 Mbit/s, ca. 1,1 GB pro Stunde)</option>
-        </select>
-      </label>
-      <h3>Twitch-Benachrichtigungen</h3>
-      <label class="row"><input type="checkbox" data-setting="twitchNotifs"> Benachrichtigungen deines Twitch-Kontos abrufen (Glocke oben rechts)</label>
-      <label class="row"><input type="checkbox" data-setting="twitchNotifPopup"> Neue auch als Windows-Meldung zeigen</label>
-      <h3>Zuschauerserie</h3>
-      <label class="row"><input type="checkbox" data-setting="showStreaks"> Zuschauerserie (Streams in Folge geschaut) mit 🔥 an den Kanälen zeigen</label>
-      <h3>Drops</h3>
-      <label class="row"><input type="checkbox" data-setting="dropsCheck"> Drop-Inventar regelmäßig prüfen</label>
-      <label class="row"><input type="checkbox" data-setting="autoClaimDrops"> Fertige Drops automatisch abholen <span class="warn-tag">gegen Twitch-Regeln</span></label>
-      <p class="setting-hint">Ausgeschaltet erscheint über der Schnellleiste jedes Streams ein <b>Drop abholen</b>-Knopf, sobald ein Drop fertig ist. Zum automatischen Abholen siehe den Hinweis unter „Kanalpunkte“.</p>
-      <label class="row"><input type="checkbox" data-setting="dropsNotify"> Windows-Meldung, wenn ein Drop bereit ist oder abgeholt wurde</label>
-      <h3>Kanalpunkte</h3>
-      <label class="row"><input type="checkbox" data-setting="autoClaimPoints"> Bonus in offenen Streams automatisch abholen <span class="warn-tag">gegen Twitch-Regeln</span></label>
-      <p class="setting-hint">Hinweis: Twitch verbietet in seinen Nutzungsbedingungen, den Dienst „automatisiert“ zu nutzen. Automatisches Abholen ist eine solche Automatik – bisher gab es dafür keine bekannten Sperrwellen, erlaubt ist es aber nicht. Gefährdet wäre dein Twitch-Konto. Ausgeschaltet zeigt Kanalwache einen <b>Abholen</b>-Knopf über der Schnellleiste des Streams, und du klickst selbst.</p>
-      <h3>Gefolgte Kanäle</h3>
-      <label class="row"><input type="checkbox" data-setting="syncFollows"> Automatisch abgleichen: neue Follows hinzufügen, entfolgte entfernen</label>
-      <div class="row"><button type="button" class="btn small" id="btn-follows-2">Gefolgte Kanäle übernehmen …</button></div>
-      <h3>Updates</h3>
-      <div class="row upd-row"><span id="upd-version" class="muted"></span>
-        <button type="button" class="btn small" id="btn-upd-check">Jetzt nach Updates suchen</button></div>
-      <label class="row"><input type="checkbox" data-setting="autoUpdate"> Beim Start und alle 6 Stunden automatisch nach Updates suchen</label>
-      <p id="upd-status" class="muted rule-hint"></p>
-      <h3>Raids</h3>
-      <label class="row"><input type="checkbox" data-setting="raidPrompt"> Bei Raids nachfragen, ob du mitraiden willst</label>
-      <h3>Streams &amp; Fenster</h3>
-      <label class="row"><input type="checkbox" data-setting="showFavBar"> Favoritenleiste unter den Tabs anzeigen</label>
-      <label class="row"><input type="checkbox" data-setting="singleAudio"> Ton nur aus einem Tab – dem Stream, den du gerade ansiehst</label>
-      <label class="row"><input type="checkbox" data-setting="fullPage"> Ganze Twitch-Seite zeigen statt nur Stream und Chat</label>
-      <label class="row"><input type="checkbox" data-setting="muteAutoOpened"> Automatisch geöffnete Streams stumm starten</label>
-      <label class="row"><input type="checkbox" data-setting="closeTabWhenOffline"> Automatisch geöffnete Tabs schließen, wenn der Stream endet</label>
-      <label class="row"><input type="checkbox" data-setting="closeToTray"> Beim Schließen im Infobereich weiterlaufen</label>
-      <label class="row"><input type="checkbox" data-setting="startInTray"> Im Infobereich starten (Fenster versteckt)</label>
-      <label class="row"><input type="checkbox" data-setting="autostart"> Mit Windows starten</label>
-      <label class="row select">Live-Status prüfen alle
-        <select data-setting="pollSeconds">
-          <option value="30">30 Sekunden</option>
-          <option value="60">1 Minute</option>
-          <option value="120">2 Minuten</option>
-          <option value="300">5 Minuten</option>
-        </select>
-      </label>
-      <div class="settings-account" id="settings-account"></div>
-      <div class="settings-actions">
-        <button value="close" class="btn primary">Fertig</button>
+  <dialog id="settings" class="settings-dlg">
+    <form method="dialog" class="settings st">
+      <header class="st-head">
+        <h2>Einstellungen</h2>
+        <input type="search" id="st-search" placeholder="Einstellung suchen …" autocomplete="off">
+        <button value="close" class="icon-btn st-close" id="st-close" title="Schließen (Esc)"></button>
+      </header>
+      <div class="st-body">
+      <nav class="st-nav" id="st-nav">
+        <button type="button" class="st-nav-btn" data-sec="st-streams"><span class="st-ico" data-icon="volume"></span>Streams &amp; Ton</button>
+        <button type="button" class="st-nav-btn" data-sec="st-chat"><span class="st-ico" data-icon="chat"></span>Chat &amp; Schnellleiste</button>
+        <button type="button" class="st-nav-btn" data-sec="st-gw"><span class="st-ico" data-icon="gift"></span>Giveaways &amp; Raids</button>
+        <button type="button" class="st-nav-btn" data-sec="st-points"><span class="st-ico" data-icon="coin"></span>Kanalpunkte &amp; Drops</button>
+        <button type="button" class="st-nav-btn" data-sec="st-notifs"><span class="st-ico" data-icon="bell"></span>Benachrichtigungen &amp; Anzeige</button>
+        <button type="button" class="st-nav-btn" data-sec="st-channels"><span class="st-ico" data-icon="star"></span>Konto &amp; Kanäle</button>
+        <button type="button" class="st-nav-btn" data-sec="st-rec"><span class="st-ico" data-icon="record"></span>Aufnahmen</button>
+        <button type="button" class="st-nav-btn" data-sec="st-app"><span class="st-ico" data-icon="gear"></span>Programm &amp; Updates</button>
+      </nav>
+      <div class="st-content" id="st-content">
+      <section class="st-sec" id="st-streams" data-title="Streams &amp; Ton">
+        <h3><span class="st-ico" data-icon="volume"></span>Streams &amp; Ton</h3>
+        <p class="st-intro">Wie Streams geöffnet, angezeigt und abgespielt werden.</p>
+        <div class="st-card">
+          <label class="st-row"><span class="st-text"><span class="st-title">Ton nur aus einem Tab</span><span class="st-desc">Nur der Stream, den du gerade ansiehst, ist zu hören.</span></span><input type="checkbox" class="switch" data-setting="singleAudio"></label>
+          <label class="st-row"><span class="st-text"><span class="st-title">Automatisch geöffnete Streams stumm starten</span><span class="st-desc">Gilt für Streams, die Kanalwache von selbst öffnet (Auge-Symbol).</span></span><input type="checkbox" class="switch" data-setting="muteAutoOpened"></label>
+          <label class="st-row"><span class="st-text"><span class="st-title">Tabs schließen, wenn der Stream endet</span><span class="st-desc">Nur für automatisch geöffnete Tabs.</span></span><input type="checkbox" class="switch" data-setting="closeTabWhenOffline"></label>
+          <label class="st-row"><span class="st-text"><span class="st-title">Ganze Twitch-Seite statt Player und Chat</span><span class="st-desc">Zeigt twitch.tv komplett – ohne Schnellleiste und Abhol-Leiste.</span></span><input type="checkbox" class="switch" data-setting="fullPage"></label>
+          <label class="st-row"><span class="st-text"><span class="st-title">Favoritenleiste unter den Tabs</span><span class="st-desc">Deine ⭐-Kanäle zum schnellen Umschalten (Alt+1–9).</span></span><input type="checkbox" class="switch" data-setting="showFavBar"></label>
+          <label class="st-row"><span class="st-text"><span class="st-title">Live-Status prüfen</span><span class="st-desc">Wie oft Kanalwache nachsieht, wer live ist.</span></span>
+            <select data-setting="pollSeconds">
+              <option value="30">alle 30 Sekunden</option>
+              <option value="60">jede Minute</option>
+              <option value="120">alle 2 Minuten</option>
+              <option value="300">alle 5 Minuten</option>
+            </select></label>
+        </div>
+      </section>
+      <section class="st-sec" id="st-chat" data-title="Chat &amp; Schnellleiste">
+        <h3><span class="st-ico" data-icon="chat"></span>Chat &amp; Schnellleiste</h3>
+        <p class="st-intro">Die Leiste unter dem Player mit Ton, Folgen/Abo und deinen Schnellnachrichten.</p>
+        <div class="st-card">
+          <div class="st-row"><span class="st-text"><span class="st-title">Schnellnachrichten</span><span class="st-desc">Knöpfe, die eine fertige Nachricht in den Chat schreiben.</span></span>
+            <button type="button" class="btn small" id="btn-quick">Bearbeiten …</button></div>
+          <div class="st-row"><span class="st-text"><span class="st-title">Chat-Verlauf</span><span class="st-desc">↑ im leeren Chat-Eingabefeld zeigt, was du schon geschrieben hast. Leeren kannst du ihn direkt in der Liste.</span></span></div>
+        </div>
+      </section>
+      <section class="st-sec" id="st-gw" data-title="Giveaways &amp; Raids">
+        <h3><span class="st-ico" data-icon="gift"></span>Giveaways &amp; Raids</h3>
+        
+        <div class="st-card">
+          <label class="st-row"><span class="st-text"><span class="st-title">Giveaways erkennen</span><span class="st-desc">Liest den Chat der Live-Kanäle mit und zeigt Giveaways mit Teilnehmen-Knopf.</span></span><input type="checkbox" class="switch" data-setting="giveawayHelper"></label>
+          <label class="st-row"><span class="st-text"><span class="st-title">Bei neuen Giveaways benachrichtigen</span></span><input type="checkbox" class="switch" data-setting="giveawayNotify"></label>
+          <div class="st-row"><span class="st-text"><span class="st-title">Erkennungswörter</span><span class="st-desc">Woran Kanalwache Giveaways und Gewinner erkennt.</span></span>
+            <button type="button" class="btn small" id="btn-rules">Bearbeiten …</button></div>
+          <label class="st-row"><span class="st-text"><span class="st-title">Bei Raids nachfragen</span><span class="st-desc">Zeigt eine Karte mit „Mitraiden“ – gewechselt wird erst, wenn der Raid durch ist.</span></span><input type="checkbox" class="switch" data-setting="raidPrompt"></label>
+        </div>
+      </section>
+      <section class="st-sec" id="st-points" data-title="Kanalpunkte &amp; Drops">
+        <h3><span class="st-ico" data-icon="coin"></span>Kanalpunkte &amp; Drops</h3>
+        <p class="st-intro">Bonus und fertige Drops holst du über die Abhol-Leiste unter dem Stream mit einem Klick ab.</p>
+        <div class="st-card">
+          <label class="st-row"><span class="st-text"><span class="st-title">Drop-Inventar prüfen</span><span class="st-desc">Zeigt fertige Drops mit Zahl am Tab „Drops“ und in der Abhol-Leiste.</span></span><input type="checkbox" class="switch" data-setting="dropsCheck"></label>
+          <label class="st-row"><span class="st-text"><span class="st-title">Windows-Meldung bei Drops</span><span class="st-desc">Wenn ein Drop bereit ist oder abgeholt wurde.</span></span><input type="checkbox" class="switch" data-setting="dropsNotify"></label>
+          <label class="st-row"><span class="st-text"><span class="st-title">Kanalpunkte-Bonus automatisch abholen <span class="warn-tag">gegen Twitch-Regeln</span></span></span><input type="checkbox" class="switch" data-setting="autoClaimPoints"></label>
+          <label class="st-row"><span class="st-text"><span class="st-title">Fertige Drops automatisch abholen <span class="warn-tag">gegen Twitch-Regeln</span></span></span><input type="checkbox" class="switch" data-setting="autoClaimDrops"></label>
+          <p class="st-warn">Twitch verbietet in seinen Nutzungsbedingungen, den Dienst „automatisiert“ zu nutzen – automatisches Abholen gehört dazu. Bekannte Sperrwellen gab es bisher nicht, gefährdet wäre aber dein Konto. Ausgeschaltet klickst du selbst in der Abhol-Leiste.</p>
+        </div>
+      </section>
+      <section class="st-sec" id="st-notifs" data-title="Benachrichtigungen &amp; Anzeige">
+        <h3><span class="st-ico" data-icon="bell"></span>Benachrichtigungen &amp; Anzeige</h3>
+        
+        <div class="st-card">
+          <label class="st-row"><span class="st-text"><span class="st-title">Twitch-Benachrichtigungen abrufen</span><span class="st-desc">Die Meldungen aus Twitchs Glocke – oben rechts in Kanalwache (Strg+B).</span></span><input type="checkbox" class="switch" data-setting="twitchNotifs"></label>
+          <label class="st-row"><span class="st-text"><span class="st-title">Neue auch als Windows-Meldung</span></span><input type="checkbox" class="switch" data-setting="twitchNotifPopup"></label>
+          <label class="st-row"><span class="st-text"><span class="st-title">Zuschauerserie anzeigen</span><span class="st-desc">🔥 mit Zahl am Kanal: so viele Streams hast du dort in Folge geschaut.</span></span><input type="checkbox" class="switch" data-setting="showStreaks"></label>
+        </div>
+      </section>
+      <section class="st-sec" id="st-channels" data-title="Konto &amp; Kanäle">
+        <h3><span class="st-ico" data-icon="star"></span>Konto &amp; Kanäle</h3>
+        
+        <div class="st-card">
+          <div id="settings-account" class="settings-account"></div>
+          <label class="st-row"><span class="st-text"><span class="st-title">Gefolgte Kanäle abgleichen</span><span class="st-desc">Neue Follows kommen automatisch dazu, entfolgte fallen raus.</span></span><input type="checkbox" class="switch" data-setting="syncFollows"></label>
+          <div class="st-row"><span class="st-text"><span class="st-title">Gefolgte Kanäle übernehmen</span><span class="st-desc">Auswählen, welche deiner Follows in die Liste sollen.</span></span>
+            <button type="button" class="btn small" id="btn-follows-2">Auswählen …</button></div>
+        </div>
+      </section>
+      <section class="st-sec" id="st-rec" data-title="Aufnahmen">
+        <h3><span class="st-ico" data-icon="record"></span>Aufnahmen</h3>
+        <p class="st-intro">Nur in Kanälen, in denen du Mod bist – über „Aufnehmen“ oben rechts im Stream-Tab.</p>
+        <div class="st-card">
+          <div class="st-row"><span class="st-text"><span class="st-title">Speicherort</span><span id="rec-dir" class="st-desc rec-dir"></span></span>
+            <span class="st-btns"><button type="button" class="btn small" id="btn-rec-open">Öffnen</button><button type="button" class="btn small" id="btn-rec-dir">Ändern …</button></span></div>
+          <label class="st-row"><span class="st-text"><span class="st-title">Qualität</span><span class="st-desc">Höher = schärfer, aber größere Dateien.</span></span>
+            <select data-setting="recordQuality">
+              <option value="high">Hoch · 8 Mbit/s · ~3,6 GB/Std.</option>
+              <option value="medium">Mittel · 5 Mbit/s · ~2,3 GB/Std.</option>
+              <option value="low">Niedrig · 2,5 Mbit/s · ~1,1 GB/Std.</option>
+            </select></label>
+        </div>
+      </section>
+      <section class="st-sec" id="st-app" data-title="Programm &amp; Updates">
+        <h3><span class="st-ico" data-icon="gear"></span>Programm &amp; Updates</h3>
+        
+        <div class="st-card">
+          <label class="st-row"><span class="st-text"><span class="st-title">Beim Schließen im Infobereich weiterlaufen</span><span class="st-desc">Kanalwache prüft dann weiter, wer live geht.</span></span><input type="checkbox" class="switch" data-setting="closeToTray"></label>
+          <label class="st-row"><span class="st-text"><span class="st-title">Versteckt im Infobereich starten</span></span><input type="checkbox" class="switch" data-setting="startInTray"></label>
+          <label class="st-row"><span class="st-text"><span class="st-title">Mit Windows starten</span></span><input type="checkbox" class="switch" data-setting="autostart"></label>
+          <div class="st-row"><span class="st-text"><span class="st-title">Version</span><span id="upd-version" class="st-desc"></span><span id="upd-status" class="st-desc"></span></span>
+            <button type="button" class="btn small" id="btn-upd-check">Nach Updates suchen</button></div>
+          <label class="st-row"><span class="st-text"><span class="st-title">Automatisch nach Updates suchen</span><span class="st-desc">Beim Start und alle 6 Stunden.</span></span><input type="checkbox" class="switch" data-setting="autoUpdate"></label>
+        </div>
+      </section>
+      <p class="st-empty muted" id="st-empty" hidden>Keine Einstellung passt zu deiner Suche.</p>
       </div>
+      </div>
+      <footer class="st-foot"><button value="close" class="btn primary">Fertig</button></footer>
     </form>
   </dialog>
 

@@ -257,6 +257,10 @@ Kanalwache sucht beim Start und danach alle 6 Stunden auf GitHub nach einer neue
 
 Die Update-Funktion gibt es ab Version 0.0.8 – ältere Versionen müssen einmal von Hand aktualisiert werden.
 
+## Einstellungen
+
+Das Zahnrad unten links öffnet die Einstellungen: links die Bereiche (Streams & Ton, Chat & Schnellleiste, Giveaways & Raids, Kanalpunkte & Drops, Benachrichtigungen & Anzeige, Konto & Kanäle, Aufnahmen, Programm & Updates), rechts die Einstellungen als Schalter mit kurzer Erklärung. Klick auf einen Bereich springt dorthin; das Suchfeld oben filtert nach Stichwort (z. B. „Drops“, „Tray“, „stumm“).
+
 ## Hinweise
 
 - Der Live-Status kommt über dieselbe Schnittstelle, die auch twitch.tv selbst nutzt – dafür ist kein eigener API-Schlüssel nötig. Fällt sie aus, wertet Kanalwache die Kanalseite direkt aus.
