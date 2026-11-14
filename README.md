@@ -61,6 +61,8 @@ Dazu die Zahl, ab wie vielen Leuten (innerhalb von 30 Sekunden) ein Giveaway ohn
 - **Standard** setzt eine Liste auf die mitgelieferten Werte zurück.
 - Im Feld **Testen** eine echte Chat-Nachricht einfügen – Kanalwache zeigt sofort, was sie daraus erkennen würde, auch erkannte Gewinner-Namen.
 
+**In der Leiste unter dem Stream:** Offene Giveaways aller Kanäle stehen auch in der Leiste über Ton und Chat-Befehlen – als Knopf „Giveaway: Kanal · !befehl“, der Kanal des aktuellen Tabs zuerst. Ein Klick schreibt den erkannten Befehl in den Chat dieses Kanals, du musst also nicht erst zur Giveaway-Übersicht. Ist ein Versuch schiefgegangen, hat der Knopf einen gelben Rand; Klick versucht es nochmal.
+
 ## Kanalpunkte
 
 In jedem offenen Stream-Tab schaut Kanalwache alle 15 Sekunden nach, ob der Bonus bereitsteht. Ist er da, erscheint über der Schnellleiste (Ton, Chat-Befehle) eine **Abhol-Leiste** mit einem Knopf **Bonus: Kanalname** – ein Klick, fertig. Die Leiste zeigt in jedem Stream die Boni **aller** offenen Streams (der gerade angezeigte zuerst, die anderen etwas blasser), du musst also nicht durch die Tabs klicken. Die Leiste ist nur zu sehen, wenn es etwas abzuholen gibt. Der aktuelle Kontostand steht im Tab (🪙); wurde in dieser Sitzung schon ein Bonus abgeholt, ist die Zahl farbig, der Tooltip zeigt wie oft.

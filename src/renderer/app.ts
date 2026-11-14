@@ -321,7 +321,7 @@ function buildTabContent(t: Tab): void {
     attachChatHistory(t, t.chat);
     t.view.className = 'view stream compact' + (t.id === activeId ? ' active' : '');
     t.view.replaceChildren(
-      h('div', { class: 'player-pane' }, h('div', { class: 'player-stage' }, t.wv), (t.cbar = h('div', { class: 'claimbar', role: 'toolbar', 'aria-label': 'Abholen' })), (t.qbar = buildQuickbar(t))),
+      h('div', { class: 'player-pane' }, h('div', { class: 'player-stage' }, t.wv), (t.cbar = h('div', { class: 'claimbar', role: 'toolbar', 'aria-label': 'Giveaways und Abholen' })), (t.qbar = buildQuickbar(t))),
       makeSplitter(),
       h('div', { class: 'chat-pane' }, t.chat),
     );
@@ -2963,6 +2963,24 @@ function renderClaimbar(t: Tab): void {
   const bar = t.cbar;
   if (!bar || !bar.isConnected) return;
   const items: Child[] = [];
+  // Offene Giveaways aller Kanäle – der Kanal dieses Tabs zuerst; Klick nimmt mit dem erkannten Befehl teil
+  const gws = (state?.giveaways ?? []).filter((g) => g.state === 'open' || g.state === 'failed' || g.state === 'sending');
+  gws.sort((a, b) => (a.channel === t.login ? -1 : b.channel === t.login ? 1 : b.detectedAt - a.detectedAt));
+  if (state?.auth.loggedIn) {
+    for (const g of gws) {
+      const name = nameOf(g.channel);
+      const sending = g.state === 'sending';
+      items.push(h('button', {
+        type: 'button', class: `cb-btn cb-gw${g.channel === t.login ? '' : ' cb-other'}${g.state === 'failed' ? ' failed' : ''}`, disabled: sending,
+        title: `Giveaway bei ${name}: schreibt „${g.entry}“ in den Chat${g.message ? `\n${g.message}` : ''}${g.state === 'failed' && g.error ? `\nLetzter Versuch: ${g.error}` : ''}`,
+        onclick: async () => {
+          const r = await api.joinGiveaway(g.id, g.entry);
+          if (!r.ok) toast(r.error ?? 'Teilnahme ging nicht.');
+          else toast(`Du nimmst am Giveaway bei ${name} teil.`);
+        },
+      }, icon('gift'), h('span', { class: 'cb-label', text: sending ? `Giveaway: ${name} …` : `Giveaway: ${name} · ${g.entry}` })));
+    }
+  }
   // Boni aller offenen Streams – der eigene zuerst, dann die übrigen in Tab-Reihenfolge
   const ready = state?.settings.autoClaimPoints ? [] : [...tabs.values()].filter((x) => x.kind === 'stream' && x.bonusReady);
   ready.sort((a, b) => (a === t ? -1 : b === t ? 1 : 0));
@@ -2979,7 +2997,7 @@ function renderClaimbar(t: Tab): void {
     items.push(h('button', { type: 'button', class: 'cb-btn cb-drop', title: `Fertige Drops abholen: ${names}`, onclick: () => void claimDropsNow() },
       icon('trophy'), h('span', { class: 'cb-label', text: drops.ready === 1 ? `Drop abholen: ${names}` : `${drops.ready} Drops abholen` })));
   }
-  const key = JSON.stringify([ready.map((x) => x.id), drops.ready, drops.names, !!state?.settings.autoClaimDrops]);
+  const key = JSON.stringify([gws.map((g) => [g.id, g.state, g.entry]), ready.map((x) => x.id), drops.ready, drops.names, !!state?.settings.autoClaimDrops]);
   if (bar.dataset.key === key) return;
   bar.dataset.key = key;
   bar.replaceChildren(...items.filter((x): x is HTMLElement => !!x));
