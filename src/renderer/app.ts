@@ -2333,11 +2333,94 @@ async function loadRecommended(force = false): Promise<void> {
   rec.loading = true;
   rec.at = Date.now();
   if (activeId === 'home') renderHome();
-  const r = await api.recommended();
+  let r = await api.recommended();
+  // Schnittstelle liefert nichts Persönliches → Empfehlungen von der Twitch-Startseite lesen (wie in der Seitenleiste dort)
+  if (!r.ok || !r.list?.length || r.source === 'topStreams') {
+    const page = await scrapeRecommended();
+    if (page.length) r = { ok: true, list: page, source: 'page' };
+  }
   rec.loading = false;
   if (r.ok && r.list) { rec.list = r.list; rec.source = r.source ?? null; rec.error = null; }
-  else rec.error = r.error ?? 'Twitch liefert gerade keine Empfehlungen.';
+  else rec.error = 'Keine Empfehlungen gefunden – weder über Twitchs Schnittstelle noch auf der Twitch-Startseite. Mit ↻ nochmal versuchen.';
   if (activeId === 'home') renderHome();
+}
+
+/** Läuft in der Twitch-Startseite: liest „Empfohlene Kanäle“ aus der Seitenleiste (klappt sie dazu einmal auf). */
+function recScrapeJs(): string {
+  return `(() => {
+  const isRec = (t) => /empfohlen|recommended|könnte dir gefallen|you might like|ähnlich|similar/i.test(t || '') && !/gefolgt|followed|following/i.test(t || '');
+  const groups = Array.from(document.querySelectorAll('.side-nav-section, [role="group"], nav section'));
+  const recGroups = groups.filter((g) => isRec(g.getAttribute('aria-label')) || isRec((g.querySelector('h2, h3, h4, [data-a-target="side-nav-header-expanded"]') || {}).textContent));
+  const links = [];
+  for (const g of recGroups) {
+    const more = Array.from(g.querySelectorAll('button')).find((b) => /mehr anzeigen|show more/i.test(b.textContent || ''));
+    if (more && !window.__kwMore) { window.__kwMore = true; more.click(); return { wait: true }; }
+    links.push(...g.querySelectorAll('a[href]'));
+  }
+  // Rückfall: Karten mit „recommended“ in der Kennung
+  if (!links.length) links.push(...document.querySelectorAll('a[data-a-id^="recommended-channel"]'));
+  const num = (t) => {
+    if (!t) return null;
+    const m = t.replace(/\\s/g, '').match(/([\\d.,]+)(tsd|k|mio|m)?/i);
+    if (!m) return null;
+    let v = m[2] ? parseFloat(m[1].replace(/\\./g, '').replace(',', '.')) : parseInt(m[1].replace(/[.,]/g, ''), 10);
+    if (/tsd|k/i.test(m[2] || '')) v *= 1000; else if (/mio|m/i.test(m[2] || '')) v *= 1e6;
+    return Number.isFinite(v) ? Math.round(v) : null;
+  };
+  const seen = new Set();
+  const out = [];
+  for (const a of links) {
+    const mm = (a.getAttribute('href') || '').match(/^\\/([A-Za-z0-9_]{2,25})\\/?$/);
+    if (!mm) continue;
+    const login = mm[1].toLowerCase();
+    if (seen.has(login)) continue;
+    seen.add(login);
+    const txt = (sel) => ((a.querySelector(sel) || {}).textContent || '').trim();
+    const status = txt('[data-a-target="side-nav-live-status"]');
+    const offline = /offline/i.test(status) || !status;
+    const img = a.querySelector('img');
+    out.push({
+      login,
+      displayName: txt('[data-a-target="side-nav-title"]') || (img && img.alt) || login,
+      avatar: img && /^https:/.test(img.src) ? img.src : null,
+      live: !offline,
+      viewers: offline ? null : num(status),
+      title: null,
+      game: txt('[data-a-target="side-nav-game-title"]') || null,
+    });
+  }
+  return { list: out };
+})()`;
+}
+
+function scrapeRecommended(): Promise<RecommendedChannel[]> {
+  return new Promise((resolve) => {
+    const wv = document.createElement('webview') as WebviewEl;
+    wv.className = 'offscreen-wv wide';
+    wv.setAttribute('src', 'https://www.twitch.tv/');
+    wv.setAttribute('partition', 'persist:twitch');
+    let done = false;
+    const started = Date.now();
+    const finish = (list: RecommendedChannel[]) => {
+      if (done) return;
+      done = true;
+      clearInterval(timer);
+      setTimeout(() => wv.remove(), 300);
+      resolve(list);
+    };
+    let best: RecommendedChannel[] = [];
+    const timer = window.setInterval(() => {
+      if (Date.now() - started > 25_000) { finish(best); return; }
+      wv.executeJavaScript(recScrapeJs()).then((raw: unknown) => {
+        const r = raw as { wait?: boolean; list?: RecommendedChannel[] } | null;
+        if (!r || r.wait || !r.list) return;
+        if (r.list.length > best.length) best = r.list;
+        // Nach dem Aufklappen ein, zwei Durchgänge abwarten, dann fertig
+        else if (best.length && Date.now() - started > 6000) finish(best);
+      }).catch(() => {});
+    }, 1500);
+    document.body.append(wv);
+  });
 }
 
 function recommendedSection(bust: number): Child[] {

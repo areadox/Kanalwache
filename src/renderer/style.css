@@ -1024,3 +1024,4 @@ main { position: relative; }
 .rec-add:hover { background: var(--accent); border-color: transparent; color: #fff; }
 .rec-add .ico { width: 13px; height: 13px; }
 .rec-more { margin-top: 10px; }
+.offscreen-wv.wide { width: 1600px; height: 1000px; }
