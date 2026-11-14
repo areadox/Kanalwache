@@ -8,6 +8,7 @@ import { ChannelStatus, fetchFollows, fetchModChannels, fetchStatuses, FollowedC
 import { fetchTwitchNotifications, TwitchNotification } from './notifications';
 import { fetchRelation, setFollow } from './relation';
 import { fetchStreaks } from './streaks';
+import { fetchRecommended } from './recommend';
 import { TwitchChat } from './chat';
 import { analyzeAnnouncement, ENTRY_RE, Giveaway, GiveawayDetector } from './giveaway';
 import { compileRules, CompiledRules, DEFAULT_RULES, sanitizeRules } from './rules';
@@ -1125,6 +1126,16 @@ function registerIpc(): void {
       win?.webContents.send('shortcut', 'drops');
     });
     n.show();
+  });
+
+  ipcMain.handle('recommended', async () => {
+    if (!authToken) return { ok: false, error: 'Bitte bei Twitch anmelden.' };
+    try {
+      const r = await fetchRecommended(authToken);
+      return { ok: true, list: r.list, source: r.source };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
   });
 
   ipcMain.handle('relation', async (_e, login: unknown) => {

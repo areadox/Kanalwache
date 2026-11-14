@@ -48,6 +48,7 @@ const ICONS = {
   record: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5" fill="currentColor"/></svg>',
   star: '<svg viewBox="0 0 24 24"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9L12 3.5Z"/></svg>',
   sword: '<svg viewBox="0 0 24 24"><path d="M14.5 17.5 3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2"/></svg>',
+  plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
   flame: '<svg viewBox="0 0 24 24"><path d="M12 21c-4 0-7-2.8-7-6.6 0-3.1 2-5.2 3.6-6.9.4 1.8 1.4 3 2.6 3.5C11 7.6 12.4 5 15 3c-.2 2.7.7 4.4 2 6 1.2 1.5 2 3.1 2 5.2 0 3.9-3 6.8-7 6.8Z"/></svg>',
   heart: '<svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10Z"/></svg>',
   home: '<svg viewBox="0 0 24 24"><path d="M4 11 12 4l8 7v9h-5v-6H9v6H4v-9Z"/></svg>',
@@ -2316,7 +2317,77 @@ function renderHome(): void {
     }
   }
 
+  if (state.auth.loggedIn) parts.push(...recommendedSection(bust));
+
   home.replaceChildren(h('div', { class: 'home-inner' }, ...parts));
+}
+
+// ---------- Von Twitch empfohlen ----------
+
+const rec: { list: RecommendedChannel[]; source: string | null; error: string | null; at: number; loading: boolean } = { list: [], source: null, error: null, at: 0, loading: false };
+let recShowAll = false;
+const REC_EVERY = 10 * 60_000;
+
+async function loadRecommended(force = false): Promise<void> {
+  if (rec.loading || (!force && Date.now() - rec.at < REC_EVERY)) return;
+  rec.loading = true;
+  rec.at = Date.now();
+  if (activeId === 'home') renderHome();
+  const r = await api.recommended();
+  rec.loading = false;
+  if (r.ok && r.list) { rec.list = r.list; rec.source = r.source ?? null; rec.error = null; }
+  else rec.error = r.error ?? 'Twitch liefert gerade keine Empfehlungen.';
+  if (activeId === 'home') renderHome();
+}
+
+function recommendedSection(bust: number): Child[] {
+  if (Date.now() - rec.at >= REC_EVERY && !rec.loading) setTimeout(() => void loadRecommended(), 0);
+  const known = new Set([state?.own?.login, ...(state?.favorites ?? []).map((c) => c.login)].filter(Boolean) as string[]);
+  const list = rec.list.filter((c) => !known.has(c.login));
+  const fallback = rec.source === 'topStreams';
+  const head = h('div', { class: 'home-sub-row' },
+    h('h2', { class: 'home-sub', text: fallback ? 'Beliebt auf Twitch (deutschsprachig)' : 'Von Twitch empfohlen' }),
+    rec.loading ? h('span', { class: 'muted', text: 'wird geladen …' }) : null,
+    iconButton('refresh', 'Empfehlungen neu laden', () => void loadRecommended(true)));
+  const out: Child[] = [head];
+  if (fallback) out.push(h('p', { class: 'muted rec-note', text: 'Deine persönlichen Empfehlungen gibt Twitch gerade nicht heraus – deshalb die meistgeschauten deutschsprachigen Streams.' }));
+  if (rec.error && !list.length) { out.push(h('p', { class: 'muted', text: rec.error })); return out; }
+  if (!list.length) { if (!rec.loading) out.push(h('p', { class: 'muted', text: 'Keine neuen Empfehlungen – alle schon in deiner Liste.' })); return out; }
+  const LIMIT = 8;
+  const grid = h('div', { class: 'rec-grid' });
+  for (const c of recShowAll ? list : list.slice(0, LIMIT)) {
+    const thumb = c.live ? h('img', { src: `https://static-cdn.jtvnw.net/previews-ttv/live_user_${c.login}-440x248.jpg?t=${bust}`, alt: '', loading: 'lazy' }) : null;
+    thumb?.addEventListener('error', () => (thumb.style.visibility = 'hidden'));
+    const pic = c.avatar ? h('img', { class: 'avatar sm', src: c.avatar, alt: '' }) : h('span', { class: 'avatar sm placeholder', text: c.displayName[0]?.toUpperCase() ?? '?' });
+    const add = h('button', {
+      class: 'rec-add', type: 'button', title: `${c.displayName} zu deinen Lieblingskanälen hinzufügen`,
+      onclick: async (e: MouseEvent) => {
+        e.stopPropagation();
+        const r = await api.addChannel(c.login);
+        toast(r.ok ? `${c.displayName} ist jetzt in deiner Liste.` : r.error ?? 'Hinzufügen ging nicht.');
+      },
+    }, icon('plus'), h('span', { text: 'Favorit' }));
+    const card = h('article', { class: 'rec-card', tabindex: '0', title: `${c.displayName} anschauen` },
+      h('div', { class: 'thumb' },
+        thumb,
+        c.live ? h('span', { class: 'badge-live', text: 'LIVE' }) : null,
+        c.viewers != null ? h('span', { class: 'badge-viewers', text: `${fmtViewers(c.viewers)} Zuschauer` }) : null),
+      h('div', { class: 'card-body' },
+        pic,
+        h('div', { class: 'card-text' },
+          h('span', { class: 'card-title', text: c.displayName }),
+          h('span', { class: 'card-meta', text: [c.game, c.title].filter(Boolean).join(' · ') || (c.live ? 'Live' : 'Offline') })),
+        add));
+    const go = () => openStream(c.login, { auto: false, muted: false, focus: true });
+    card.addEventListener('click', go);
+    card.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+    grid.append(card);
+  }
+  out.push(grid);
+  if (list.length > LIMIT) {
+    out.push(h('button', { class: 'offline-chip more rec-more', type: 'button', text: recShowAll ? 'Weniger anzeigen' : `Alle ${list.length} Empfehlungen anzeigen`, onclick: () => { recShowAll = !recShowAll; renderHome(); } }));
+  }
+  return out;
 }
 
 // ---------- Giveaways ----------

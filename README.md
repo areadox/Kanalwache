@@ -22,6 +22,7 @@ Ein eigener Twitch-Viewer für Windows: dein Kanal und deine Lieblingskanäle an
 - **Gefolgte Kanäle übernehmen**: alle Kanäle, denen du folgst, mit einem Klick in die Liste – auf Wunsch laufend abgeglichen (siehe unten)
 - **Aufnahme**: Streams als Video aufnehmen – nur in Kanälen, in denen du Mod bist (siehe unten)
 - **Raids**: Raidet ein Kanal am Streamende, fragt Kanalwache mit einer Karte nach: mitraiden oder nicht (siehe unten)
+- **Von Twitch empfohlen**: unten in der Übersicht stehen Kanäle, die Twitch dir empfiehlt (wie „Empfohlene Kanäle“ auf twitch.tv) – mit Vorschaubild, Spiel und Zuschauern. Klick öffnet den Stream, **+ Favorit** nimmt den Kanal in deine Liste auf. Kanäle, die schon in deiner Liste sind, werden ausgeblendet; alle 10 Minuten neu (oder ↻). Gibt Twitch die persönlichen Empfehlungen nicht heraus, zeigt Kanalwache stattdessen die meistgeschauten deutschsprachigen Streams und sagt das dazu.
 - **Zuschauerserie**: 🔥 mit Zahl am Kanal = so viele Streams hast du dort in Folge geschaut (Twitchs „Watch Streak“). Wird alle 20 Minuten bei Twitch abgefragt; abschaltbar unter Einstellungen → *Zuschauerserie*. Twitch dokumentiert diese Angabe nicht – fehlt das 🔥, obwohl du eine Serie hast, liefert Twitch sie gerade nicht.
 - **Drops**: zeigt dein Drop-Inventar, meldet fertige Drops und bietet einen **Drop abholen**-Knopf (siehe unten)
 - **Twitch-Benachrichtigungen**: die Meldungen aus Twitchs Glocke direkt in Kanalwache (siehe unten)
