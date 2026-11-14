@@ -48,6 +48,7 @@ const ICONS = {
   record: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5" fill="currentColor"/></svg>',
   star: '<svg viewBox="0 0 24 24"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9L12 3.5Z"/></svg>',
   sword: '<svg viewBox="0 0 24 24"><path d="M14.5 17.5 3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2"/></svg>',
+  compass: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5 5-2Z"/></svg>',
   plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
   flame: '<svg viewBox="0 0 24 24"><path d="M12 21c-4 0-7-2.8-7-6.6 0-3.1 2-5.2 3.6-6.9.4 1.8 1.4 3 2.6 3.5C11 7.6 12.4 5 15 3c-.2 2.7.7 4.4 2 6 1.2 1.5 2 3.1 2 5.2 0 3.9-3 6.8-7 6.8Z"/></svg>',
   heart: '<svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10Z"/></svg>',
@@ -444,12 +445,13 @@ function closeTab(id: string, batch = false, recStopped = false): void {
   } else renderTabBar();
 }
 
-const FIXED_VIEWS = ['home', 'giveaways', 'drops'];
+const FIXED_VIEWS = ['home', 'giveaways', 'drops', 'twitch'];
 /** Feste Seiten, die beim Durchschalten (Strg+Tab, Strg+1–9) mitzählen */
 const NAV_VIEWS = ['home', 'giveaways'];
 
 function activate(id: string): void {
   activeId = tabs.has(id) || FIXED_VIEWS.includes(id) ? id : 'home';
+  if (activeId === 'twitch') ensureTwitchHome();
   // Ton folgt dem aktiven Stream; auf Übersicht/Giveaways läuft der bisherige weiter
   if (singleAudio() && tabs.get(activeId)?.kind === 'stream' && audioTabId !== activeId) setAudioTab(activeId, false);
   for (const v of FIXED_VIEWS) document.getElementById(`view-${v}`)!.classList.toggle('active', activeId === v);
@@ -607,6 +609,8 @@ function renderTabBar(): void {
           icon('trophy'), h('span', { text: 'Drops' }),
           drops.ready ? h('span', { class: 'pill', text: String(drops.ready) }) : null)
       : null,
+    h('button', { class: `tab home-tab${activeId === 'twitch' ? ' active' : ''}`, type: 'button', title: 'Startseite von Twitch – Kanäle öffnen sich hier als Tab', onclick: () => activate('twitch') },
+      icon('compass'), h('span', { text: 'Twitch' })),
   );
 
   const scroller = h('div', { class: 'tabs-scroll', role: 'tablist' }, ...[...tabs.values()].map(tabButton));
@@ -2317,160 +2321,51 @@ function renderHome(): void {
     }
   }
 
-  if (state.auth.loggedIn) parts.push(...recommendedSection(bust));
-
   home.replaceChildren(h('div', { class: 'home-inner' }, ...parts));
 }
 
-// ---------- Von Twitch empfohlen ----------
+// ---------- Twitch-Startseite ----------
 
-const rec: { list: RecommendedChannel[]; source: string | null; error: string | null; at: number; loading: boolean } = { list: [], source: null, error: null, at: 0, loading: false };
-let recShowAll = false;
-const REC_EVERY = 10 * 60_000;
+const TWITCH_HOME = 'https://www.twitch.tv/';
+let twitchWv: WebviewEl | null = null;
+/** Pfade, die keine Kanäle sind */
+const NON_CHANNEL = new Set(['directory', 'settings', 'subscriptions', 'inventory', 'drops', 'wallet', 'search', 'videos', 'p', 'downloads', 'jobs', 'turbo', 'friends', 'messages', 'prime', 'store', 'notifications', 'popout', 'moderator', 'u', 'login', 'signup', 'following', 'annual-recap', 'creatorcamp', 'bits']);
 
-async function loadRecommended(force = false): Promise<void> {
-  if (rec.loading || (!force && Date.now() - rec.at < REC_EVERY)) return;
-  rec.loading = true;
-  rec.at = Date.now();
-  if (activeId === 'home') renderHome();
-  let r = await api.recommended();
-  // Schnittstelle liefert nichts Persönliches → Empfehlungen von der Twitch-Startseite lesen (wie in der Seitenleiste dort)
-  if (!r.ok || !r.list?.length || r.source === 'topStreams') {
-    const page = await scrapeRecommended();
-    if (page.length) r = { ok: true, list: page, source: 'page' };
-  }
-  rec.loading = false;
-  if (r.ok && r.list) { rec.list = r.list; rec.source = r.source ?? null; rec.error = null; }
-  else rec.error = 'Keine Empfehlungen gefunden – weder über Twitchs Schnittstelle noch auf der Twitch-Startseite. Mit ↻ nochmal versuchen.';
-  if (activeId === 'home') renderHome();
-}
-
-/** Läuft in der Twitch-Startseite: liest „Empfohlene Kanäle“ aus der Seitenleiste (klappt sie dazu einmal auf). */
-function recScrapeJs(): string {
-  return `(() => {
-  const isRec = (t) => /empfohlen|recommended|könnte dir gefallen|you might like|ähnlich|similar/i.test(t || '') && !/gefolgt|followed|following/i.test(t || '');
-  const groups = Array.from(document.querySelectorAll('.side-nav-section, [role="group"], nav section'));
-  const recGroups = groups.filter((g) => isRec(g.getAttribute('aria-label')) || isRec((g.querySelector('h2, h3, h4, [data-a-target="side-nav-header-expanded"]') || {}).textContent));
-  const links = [];
-  for (const g of recGroups) {
-    const more = Array.from(g.querySelectorAll('button')).find((b) => /mehr anzeigen|show more/i.test(b.textContent || ''));
-    if (more && !window.__kwMore) { window.__kwMore = true; more.click(); return { wait: true }; }
-    links.push(...g.querySelectorAll('a[href]'));
-  }
-  // Rückfall: Karten mit „recommended“ in der Kennung
-  if (!links.length) links.push(...document.querySelectorAll('a[data-a-id^="recommended-channel"]'));
-  const num = (t) => {
-    if (!t) return null;
-    const m = t.replace(/\\s/g, '').match(/([\\d.,]+)(tsd|k|mio|m)?/i);
-    if (!m) return null;
-    let v = m[2] ? parseFloat(m[1].replace(/\\./g, '').replace(',', '.')) : parseInt(m[1].replace(/[.,]/g, ''), 10);
-    if (/tsd|k/i.test(m[2] || '')) v *= 1000; else if (/mio|m/i.test(m[2] || '')) v *= 1e6;
-    return Number.isFinite(v) ? Math.round(v) : null;
+/** Startseite von twitch.tv im eigenen Tab – Kanäle, die du dort anklickst, öffnen sich als Stream-Tab in Kanalwache. */
+function ensureTwitchHome(): void {
+  if (twitchWv) return;
+  const stage = document.getElementById('twitch-stage')!;
+  const wv = createWebview(TWITCH_HOME, () => {});
+  twitchWv = wv;
+  // Startseite spielt oft selbst einen Stream ab – stumm, der Ton gehört deinen Tabs
+  wv.addEventListener('dom-ready', () => { try { wv.setAudioMuted(true); } catch { /* egal */ } updateTwitchBar(); });
+  const onNav = (url: string) => {
+    updateTwitchBar();
+    const m = url.match(/^https:\/\/(?:www\.)?twitch\.tv\/([A-Za-z0-9_]{2,25})\/?(?:[?#].*)?$/);
+    if (!m || NON_CHANNEL.has(m[1].toLowerCase())) return;
+    openStream(m[1].toLowerCase(), { auto: false, muted: false, focus: true });
+    // Startseite bleibt, wo sie war
+    if (wv.canGoBack()) wv.goBack(); else void wv.loadURL(TWITCH_HOME).catch(() => {});
   };
-  const seen = new Set();
-  const out = [];
-  for (const a of links) {
-    const mm = (a.getAttribute('href') || '').match(/^\\/([A-Za-z0-9_]{2,25})\\/?$/);
-    if (!mm) continue;
-    const login = mm[1].toLowerCase();
-    if (seen.has(login)) continue;
-    seen.add(login);
-    const txt = (sel) => ((a.querySelector(sel) || {}).textContent || '').trim();
-    const status = txt('[data-a-target="side-nav-live-status"]');
-    const offline = /offline/i.test(status) || !status;
-    const img = a.querySelector('img');
-    out.push({
-      login,
-      displayName: txt('[data-a-target="side-nav-title"]') || (img && img.alt) || login,
-      avatar: img && /^https:/.test(img.src) ? img.src : null,
-      live: !offline,
-      viewers: offline ? null : num(status),
-      title: null,
-      game: txt('[data-a-target="side-nav-game-title"]') || null,
-    });
-  }
-  return { list: out };
-})()`;
+  wv.addEventListener('did-navigate-in-page', (e: Event) => { if ((e as unknown as { isMainFrame?: boolean }).isMainFrame !== false) onNav((e as unknown as { url: string }).url); });
+  wv.addEventListener('did-navigate', (e: Event) => onNav((e as unknown as { url: string }).url));
+  stage.replaceChildren(wv);
 }
 
-function scrapeRecommended(): Promise<RecommendedChannel[]> {
-  return new Promise((resolve) => {
-    const wv = document.createElement('webview') as WebviewEl;
-    wv.className = 'offscreen-wv wide';
-    wv.setAttribute('src', 'https://www.twitch.tv/');
-    wv.setAttribute('partition', 'persist:twitch');
-    let done = false;
-    const started = Date.now();
-    const finish = (list: RecommendedChannel[]) => {
-      if (done) return;
-      done = true;
-      clearInterval(timer);
-      setTimeout(() => wv.remove(), 300);
-      resolve(list);
-    };
-    let best: RecommendedChannel[] = [];
-    const timer = window.setInterval(() => {
-      if (Date.now() - started > 25_000) { finish(best); return; }
-      wv.executeJavaScript(recScrapeJs()).then((raw: unknown) => {
-        const r = raw as { wait?: boolean; list?: RecommendedChannel[] } | null;
-        if (!r || r.wait || !r.list) return;
-        if (r.list.length > best.length) best = r.list;
-        // Nach dem Aufklappen ein, zwei Durchgänge abwarten, dann fertig
-        else if (best.length && Date.now() - started > 6000) finish(best);
-      }).catch(() => {});
-    }, 1500);
-    document.body.append(wv);
-  });
+function updateTwitchBar(): void {
+  const back = document.getElementById('tw-back') as HTMLButtonElement | null;
+  if (back && twitchWv) { try { back.disabled = !twitchWv.canGoBack(); } catch { back.disabled = true; } }
 }
 
-function recommendedSection(bust: number): Child[] {
-  if (Date.now() - rec.at >= REC_EVERY && !rec.loading) setTimeout(() => void loadRecommended(), 0);
-  const known = new Set([state?.own?.login, ...(state?.favorites ?? []).map((c) => c.login)].filter(Boolean) as string[]);
-  const list = rec.list.filter((c) => !known.has(c.login));
-  const fallback = rec.source === 'topStreams';
-  const head = h('div', { class: 'home-sub-row' },
-    h('h2', { class: 'home-sub', text: fallback ? 'Beliebt auf Twitch (deutschsprachig)' : 'Von Twitch empfohlen' }),
-    rec.loading ? h('span', { class: 'muted', text: 'wird geladen …' }) : null,
-    iconButton('refresh', 'Empfehlungen neu laden', () => void loadRecommended(true)));
-  const out: Child[] = [head];
-  if (fallback) out.push(h('p', { class: 'muted rec-note', text: 'Deine persönlichen Empfehlungen gibt Twitch gerade nicht heraus – deshalb die meistgeschauten deutschsprachigen Streams.' }));
-  if (rec.error && !list.length) { out.push(h('p', { class: 'muted', text: rec.error })); return out; }
-  if (!list.length) { if (!rec.loading) out.push(h('p', { class: 'muted', text: 'Keine neuen Empfehlungen – alle schon in deiner Liste.' })); return out; }
-  const LIMIT = 8;
-  const grid = h('div', { class: 'rec-grid' });
-  for (const c of recShowAll ? list : list.slice(0, LIMIT)) {
-    const thumb = c.live ? h('img', { src: `https://static-cdn.jtvnw.net/previews-ttv/live_user_${c.login}-440x248.jpg?t=${bust}`, alt: '', loading: 'lazy' }) : null;
-    thumb?.addEventListener('error', () => (thumb.style.visibility = 'hidden'));
-    const pic = c.avatar ? h('img', { class: 'avatar sm', src: c.avatar, alt: '' }) : h('span', { class: 'avatar sm placeholder', text: c.displayName[0]?.toUpperCase() ?? '?' });
-    const add = h('button', {
-      class: 'rec-add', type: 'button', title: `${c.displayName} zu deinen Lieblingskanälen hinzufügen`,
-      onclick: async (e: MouseEvent) => {
-        e.stopPropagation();
-        const r = await api.addChannel(c.login);
-        toast(r.ok ? `${c.displayName} ist jetzt in deiner Liste.` : r.error ?? 'Hinzufügen ging nicht.');
-      },
-    }, icon('plus'), h('span', { text: 'Favorit' }));
-    const card = h('article', { class: 'rec-card', tabindex: '0', title: `${c.displayName} anschauen` },
-      h('div', { class: 'thumb' },
-        thumb,
-        c.live ? h('span', { class: 'badge-live', text: 'LIVE' }) : null,
-        c.viewers != null ? h('span', { class: 'badge-viewers', text: `${fmtViewers(c.viewers)} Zuschauer` }) : null),
-      h('div', { class: 'card-body' },
-        pic,
-        h('div', { class: 'card-text' },
-          h('span', { class: 'card-title', text: c.displayName }),
-          h('span', { class: 'card-meta', text: [c.game, c.title].filter(Boolean).join(' · ') || (c.live ? 'Live' : 'Offline') })),
-        add));
-    const go = () => openStream(c.login, { auto: false, muted: false, focus: true });
-    card.addEventListener('click', go);
-    card.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
-    grid.append(card);
-  }
-  out.push(grid);
-  if (list.length > LIMIT) {
-    out.push(h('button', { class: 'offline-chip more rec-more', type: 'button', text: recShowAll ? 'Weniger anzeigen' : `Alle ${list.length} Empfehlungen anzeigen`, onclick: () => { recShowAll = !recShowAll; renderHome(); } }));
-  }
-  return out;
+function setupTwitchHome(): void {
+  document.getElementById('tw-back')!.replaceChildren(icon('left'));
+  document.getElementById('tw-home')!.replaceChildren(icon('home'));
+  document.getElementById('tw-reload')!.replaceChildren(icon('refresh'));
+  document.getElementById('tw-web')!.replaceChildren(icon('external'));
+  document.getElementById('tw-back')!.addEventListener('click', () => { if (twitchWv?.canGoBack()) twitchWv.goBack(); });
+  document.getElementById('tw-home')!.addEventListener('click', () => void twitchWv?.loadURL(TWITCH_HOME).catch(() => {}));
+  document.getElementById('tw-reload')!.addEventListener('click', () => twitchWv?.reload());
+  document.getElementById('tw-web')!.addEventListener('click', () => void api.openExternal(twitchWv?.getURL() || TWITCH_HOME));
 }
 
 // ---------- Giveaways ----------
@@ -3673,6 +3568,7 @@ async function main(): Promise<void> {
   setupTabList();
   setupNotifs();
   setupDrops();
+  setupTwitchHome();
   api.onToast(toast);
   setupFollowsDialog();
   document.getElementById('fav-filter')!.addEventListener('input', () => renderSidebar());
