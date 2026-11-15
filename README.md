@@ -126,8 +126,8 @@ Was du im Chat schreibst, merkt sich Kanalwache (die letzten 50 Nachrichten, üb
 
 Unter jedem Stream (in der Ansicht „nur Player und Chat“) liegt eine Leiste mit:
 
-- **Ton an / Stumm** – wie Strg+M, schaltet sofort um; bei „Ton nur aus einem Tab“ holt der Knopf an einem stummen Tab den Ton hierher.
-- **Folgen / Gefolgt** – folgt dem Kanal mit einem Klick; steht dort „Gefolgt“, entfolgt ein Klick (mit Rückfrage). Lehnt Twitch das direkte Folgen ab, drückt Kanalwache unsichtbar den Folgen-Knopf auf der Kanalseite.
+- **Ton an / Stumm** – wie Strg+M, schaltet sofort um; bei „Ton nur aus einem Tab“ holt der Knopf an einem stummen Tab den Ton hierher. Kanalwache **merkt sich die Stummschaltung pro Kanal**: Hast du einen Kanal stumm geschaltet, startet er beim nächsten Öffnen wieder stumm – bis du den Ton dort wieder einschaltest.
+- **Folgen / Gefolgt** – folgt dem Kanal mit einem Klick. Folgst du schon, ist der Knopf nur noch ein kleines Herz; ein Klick darauf entfolgt (mit Rückfrage). Lehnt Twitch das direkte Folgen ab, drückt Kanalwache unsichtbar den Folgen-Knopf auf der Kanalseite.
 - **Abonnieren** – öffnet Twitchs Abo-Seite des Kanals in einem Fenster in Kanalwache (angemeldet): Abo abschließen, verlängern oder verschenken; bezahlt wird direkt bei Twitch. Hast du schon ein Abo, steht dort „Abonniert (Stufe …)“. Bei deinem eigenen Kanal fehlen beide Knöpfe.
 - **Lautstärkeregler** – eine gemeinsame Lautstärke für alle Streams, die gemerkt wird. Kanalwache hält sie in jedem Player gleich, auch wenn Twitch die Lautstärke nach Werbung oder beim Neuladen zurücksetzt. Bewegst du im aktiven Stream Twitchs eigenen Regler, wird das die neue gemeinsame Lautstärke; Twitchs Stumm-Knopf schaltet wie Strg+M um.
 - **Schnellnachrichten** – ein Klick schreibt die Nachricht mit deinem Account in den Chat des Kanals. Der Knopf wird kurz grün, wenn Twitch die Nachricht angenommen hat; lehnt Twitch ab (z. B. Follower-only, Slow-Mode, Timeout), steht der Grund in der Meldung.
@@ -260,6 +260,8 @@ Die Update-Funktion gibt es ab Version 0.0.8 – ältere Versionen müssen einma
 ## Einstellungen
 
 Das Zahnrad unten links öffnet die Einstellungen: links die Bereiche (Streams & Ton, Chat & Schnellleiste, Giveaways & Raids, Kanalpunkte & Drops, Benachrichtigungen & Anzeige, Konto & Kanäle, Aufnahmen, Programm & Updates), rechts die Einstellungen als Schalter mit kurzer Erklärung. Klick auf einen Bereich springt dorthin; das Suchfeld oben filtert nach Stichwort (z. B. „Drops“, „Tray“, „stumm“).
+
+**Mit Windows starten:** Kanalwache öffnet beim Windows-Start ganz normal sein Fenster. Nur wenn zusätzlich „Versteckt im Infobereich starten“ an ist, startet es unsichtbar im Infobereich.
 
 ## Hinweise
 

@@ -387,7 +387,7 @@ function openStream(login: string, opts: { auto: boolean; muted: boolean; focus:
   document.getElementById('views')!.append(view);
   const tab: Tab = {
     id, kind: 'stream', login, auto: opts.auto, button: h('div'), view,
-    wv: null as unknown as WebviewEl, ready: false, chat: null, chatReady: false, muted: opts.muted,
+    wv: null as unknown as WebviewEl, ready: false, chat: null, chatReady: false, muted: opts.muted || mutedChannels.has(login),
     mode, claims: 0, balance: null, playing: null, rec: null, recStarting: false, qbar: null, cbar: null, bonusReady: false,
   };
   buildTabContent(tab);
@@ -397,7 +397,7 @@ function openStream(login: string, opts: { auto: boolean; muted: boolean; focus:
   else if (opts.auto && activeId === 'home' && tabs.size === 1) {
     activate(id);
     // Automatisch geöffnet: Stumm-Einstellung für automatisch geöffnete Streams beachten
-    if (singleAudio()) setAudioTab(id, opts.muted);
+    if (singleAudio()) setAudioTab(id, opts.muted || mutedChannels.has(login));
   } else renderTabBar();
   if (opts.auto) toast(`${channelByLogin(login) ? displayName(channelByLogin(login)!) : login} ist live – du schaust jetzt zu.`);
 }
@@ -453,7 +453,7 @@ function activate(id: string): void {
   activeId = tabs.has(id) || FIXED_VIEWS.includes(id) ? id : 'home';
   if (activeId === 'twitch') ensureTwitchHome();
   // Ton folgt dem aktiven Stream; auf Übersicht/Giveaways läuft der bisherige weiter
-  if (singleAudio() && tabs.get(activeId)?.kind === 'stream' && audioTabId !== activeId) setAudioTab(activeId, false);
+  if (singleAudio() && tabs.get(activeId)?.kind === 'stream' && audioTabId !== activeId) setAudioTab(activeId, isRememberedMuted(activeId));
   for (const v of FIXED_VIEWS) document.getElementById(`view-${v}`)!.classList.toggle('active', activeId === v);
   for (const t of tabs.values()) t.view.classList.toggle('active', t.id === activeId);
   renderTabBar();
@@ -1069,7 +1069,9 @@ function fillRel(box: HTMLElement, login: string): void {
     type: 'button', class: `qb-follow${following ? ' is-on' : ''}`, disabled: !!r?.busy,
     title: following ? `Du folgst ${name} – klicken zum Entfolgen` : `${name} folgen`,
     onclick: () => void toggleFollow(login),
-  }, icon('heart'), h('span', { text: r?.busy ? '…' : following ? 'Gefolgt' : 'Folgen' }));
+    'aria-label': following ? `${name} gefolgt` : `${name} folgen`,
+    // Schon gefolgt: nur noch ein kleines Herz
+  }, icon('heart'), following && !r?.busy ? null : h('span', { text: r?.busy ? '…' : 'Folgen' }));
   const tier = rel?.subTier ? ` (Stufe ${String(rel.subTier).replace(/000$/, '')})` : '';
   const sub = h('button', {
     type: 'button', class: `qb-sub${rel?.subTier ? ' is-on' : ''}`,
@@ -1366,6 +1368,22 @@ function singleAudio(): boolean {
   return state?.settings.singleAudio !== false;
 }
 
+/** Kanäle, die du zuletzt stumm geschaltet hast – gilt beim nächsten Öffnen wieder */
+const mutedChannels = new Set<string>((() => {
+  try { const v = JSON.parse(localStorage.getItem('kw.mutedChannels') ?? '[]'); return Array.isArray(v) ? v.filter((x) => typeof x === 'string') : []; } catch { return []; }
+})());
+
+function rememberMute(login: string | null | undefined, muted: boolean): void {
+  if (!login || mutedChannels.has(login) === muted) return;
+  if (muted) mutedChannels.add(login); else mutedChannels.delete(login);
+  try { localStorage.setItem('kw.mutedChannels', JSON.stringify([...mutedChannels])); } catch { /* egal */ }
+}
+
+function isRememberedMuted(id: string): boolean {
+  const login = tabs.get(id)?.login;
+  return !!login && mutedChannels.has(login);
+}
+
 /** Soll dieser Tab gerade stumm sein? */
 function wantMuted(t: Tab): boolean {
   if (!singleAudio()) return t.muted;
@@ -1398,6 +1416,8 @@ function toggleMute(t: Tab): void {
     t.wv.setAudioMuted(!t.wv.isAudioMuted());
     t.muted = t.wv.isAudioMuted();
   }
+  // Merken: beim nächsten Öffnen dieses Kanals gleich wieder stumm bzw. laut
+  rememberMute(t.login, wantMuted(t));
   renderTabBar();
 }
 

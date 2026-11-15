@@ -716,10 +716,12 @@ function applyAutostart(): void {
   // Die portable .exe entpackt sich bei jedem Start in einen Temp-Ordner;
   // für den Autostart muss die eigentliche .exe eingetragen werden.
   const exe = process.env.PORTABLE_EXECUTABLE_FILE || process.execPath;
+  // Versteckt (nur im Infobereich) nur dann, wenn „Versteckt im Infobereich starten“ an ist –
+  // sonst öffnet sich beim Windows-Start ganz normal das Fenster.
   app.setLoginItemSettings({
     openAtLogin: store.config.settings.autostart,
     path: exe,
-    args: ['--hidden'],
+    args: store.config.settings.startInTray ? ['--hidden'] : [],
   });
 }
 
