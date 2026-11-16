@@ -1885,7 +1885,34 @@ function raidClickJs(kind: 'join' | 'leave'): string {
 }
 
 /** Zugesagte Raids je Quelle: gewechselt wird erst, wenn der Raid im Chat der Quelle durch ist */
-const armedRaids = new Map<string, { target: string; targetName: string; at: number; onDone: () => void }>();
+const armedRaids = new Map<string, { target: string; targetName: string; at: number; onDone: () => void; bannerSeen?: boolean; bannerAt?: number }>();
+
+/**
+ * Läuft im alten Chat: Raid abgebrochen? Sucht in den letzten Systemzeilen nach „Raid … abgebrochen/canceled“.
+ * Wird per toString() in die Seite geschickt.
+ */
+function raidTargetDone(target: string, name: string): boolean {
+  const log = document.querySelector('[data-test-selector="chat-scrollable-area__message-container"], .chat-scrollable-area__message-container, [role="log"]');
+  if (!log) return false;
+  const a = target.toLowerCase();
+  const b = name.toLowerCase();
+  return Array.from(log.children).slice(-20).some((el) => {
+    const t = (el.textContent || '').replace(/\s+/g, ' ').toLowerCase();
+    if (t.length > 240 || el.querySelector('[data-a-target="chat-message-username"]')) return false;
+    // Ziel genannt + ein Abschluss-Wort – Zahlen und genauer Wortlaut egal
+    return (t.includes(a) || t.includes(b)) && /geraidet|raided|weitergeleitet|redirect|abgeschlossen|complete|erfolgreich|successful/.test(t);
+  });
+}
+
+function raidCancelScan(): boolean {
+  const log = document.querySelector('[data-test-selector="chat-scrollable-area__message-container"], .chat-scrollable-area__message-container, [role="log"]');
+  if (!log) return false;
+  const items = Array.from(log.children).slice(-15);
+  return items.some((el) => {
+    const t = (el.textContent || '').replace(/\s+/g, ' ');
+    return t.length < 200 && /raid/i.test(t) && /abgebrochen|beendet ohne|canceled|cancelled|gestoppt|stopped/i.test(t) && !el.querySelector('[data-a-target="chat-message-username"]');
+  });
+}
 /** Spätestens danach wechseln, falls die Abschluss-Zeile nicht erkannt wird (Twitchs Countdown: bis 90 s) */
 const RAID_ARM_MAX_MS = 150_000;
 
@@ -1916,10 +1943,27 @@ async function watchRaids(): Promise<void> {
       if (!(t.chat ? t.chatReady : t.ready)) continue;
       const armed = armedRaids.get(t.login);
       if (armed) {
-        // Auf Twitchs Abschluss-Zeile im alten Chat warten („… hat … geraidet“ / „wird weitergeleitet“)
+        // Wann ist der Raid durch? Nicht an einem bestimmten Wortlaut festmachen (Zuschauerzahl & Text ändern sich),
+        // sondern an mehreren Zeichen – das erste, das zutrifft, zählt:
+        //  1. das Raid-Banner war da und ist jetzt weg (Countdown abgelaufen)
+        //  2. Twitchs Abschluss-Zeile im alten Chat („… geraidet“, „weitergeleitet“ …)
+        //  3. der Player ist schon beim Ziel / der Raider ist offline
         try {
-          const d = (await target.executeJavaScript(`(${raidDoneScan.toString()})(${JSON.stringify(t.login)}, ${JSON.stringify(nameOf(t.login))}, true)`)) as { target: string } | null;
-          if (d) completeRaid(t.login, armed.target, armed.targetName);
+          const banner = (await target.executeJavaScript(RAID_JS)) as { target: string } | null;
+          if (banner) { armed.bannerSeen = true; armed.bannerAt = Date.now(); }
+          if (await target.executeJavaScript(`(${raidCancelScan.toString()})()`)) {
+            armedRaids.delete(t.login);
+            armed.onDone();
+            toast('Der Raid wurde abgebrochen – du bleibst hier.');
+            continue;
+          }
+          const bannerGone = armed.bannerSeen && !banner && Date.now() - (armed.bannerAt ?? 0) > 2500;
+          const d = bannerGone ? null : ((await target.executeJavaScript(`(${raidDoneScan.toString()})(${JSON.stringify(t.login)}, ${JSON.stringify(nameOf(t.login))}, true)`)) as { target: string } | null)
+            ?? ((await target.executeJavaScript(`(${raidTargetDone.toString()})(${JSON.stringify(armed.target)}, ${JSON.stringify(armed.targetName)})`)) ? { target: armed.target } : null);
+          let playerAtTarget = false;
+          try { playerAtTarget = new RegExp(`[?&]channel=${armed.target}(?:&|$)|twitch\\.tv/${armed.target}(?:[/?#]|$)`, 'i').test(t.wv.getURL()); } catch { /* egal */ }
+          const srcOffline = channelByLogin(t.login)?.status?.live === false;
+          if (bannerGone || d || playerAtTarget || srcOffline) completeRaid(t.login, armed.target, armed.targetName);
         } catch { /* Seite lädt gerade */ }
         continue;
       }
