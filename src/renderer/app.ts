@@ -1161,7 +1161,7 @@ async function pumpIncoming(): Promise<void> {
       const lang = inTrLang(t);
       if (!lang) break;
       inStamps.push(now);
-      const r = await api.translate(item.text, lang, 'de', true);
+      const r = await api.translate(item.text, lang, 'de', true, 'in');
       if (r.ok && r.text && r.text.trim().toLowerCase() !== item.text.trim().toLowerCase()) {
         void t.chat?.executeJavaScript(`window.__kwTrShow && window.__kwTrShow(${JSON.stringify(item.id)}, ${JSON.stringify(r.text)}, ${JSON.stringify(r.service ?? '')})`).catch(() => {});
       }
@@ -1205,7 +1205,7 @@ function syncTranslator(t: Tab, force = false): void {
 async function translateAndSend(t: Tab, text: string, fromInput: boolean): Promise<boolean> {
   const lang = trTarget(t);
   if (!t.login || !lang) { const r = await api.chatSend(t.login!, text); if (r.ok) rememberChat(text); return r.ok; }
-  const tr = await api.translate(text, 'de', lang);
+  const tr = await api.translate(text, 'de', lang, false, 'out');
   if (!tr.ok || !tr.text) {
     toast(`${tr.error ?? 'Übersetzung ging nicht.'} Die Nachricht steht wieder im Eingabefeld.`);
     if (fromInput) void t.chat?.executeJavaScript(`window.__kwInsert && window.__kwInsert(${JSON.stringify(text)})`).catch(() => {});
@@ -3821,38 +3821,52 @@ const TR_INFO: Record<string, { desc: string; url?: string; urlDesc?: string; ke
 };
 
 function updateTranslatorSettings(): void {
-  const sel = document.getElementById('tr-service') as HTMLSelectElement | null;
-  if (!sel) return;
-  const svc = sel.value || 'mymemory';
-  const info = TR_INFO[svc] ?? TR_INFO.mymemory;
-  for (const row of document.querySelectorAll<HTMLElement>('#settings .tr-opt')) {
-    row.classList.toggle('tr-hidden', !(row.dataset.for ?? '').split(' ').includes(svc));
+  for (const sel of document.querySelectorAll<HTMLSelectElement>('#settings .tr-service')) {
+    const pre = sel.dataset.pre!;
+    const svc = sel.value || 'mymemory';
+    const same = svc === 'same';
+    const info = same ? { desc: 'Nutzt denselben Dienst wie die Eingabe.' } as (typeof TR_INFO)[string] : TR_INFO[svc] ?? TR_INFO.mymemory;
+    for (const row of document.querySelectorAll<HTMLElement>(`#settings .tr-opt[data-pre="${pre}"]`)) {
+      row.classList.toggle('tr-hidden', same || !(row.dataset.for ?? '').split(' ').includes(svc));
+    }
+    document.getElementById(`${pre}-desc`)!.textContent = info.desc;
+    document.getElementById(`${pre}-url-desc`)!.textContent = info.urlDesc ?? '';
+    document.getElementById(`${pre}-key-desc`)!.textContent = info.key ?? '';
+    document.getElementById(`${pre}-model-desc`)!.textContent = info.modelDesc ?? '';
+    (document.getElementById(`${pre}-url`) as HTMLInputElement).placeholder = info.url ?? '';
+    (document.getElementById(`${pre}-model`) as HTMLInputElement).placeholder = info.model ?? '';
+    const out = document.getElementById(`${pre}-test-out`)!;
+    if (!out.dataset.result) out.textContent = pre === 'tr' ? 'Übersetzt „Hallo zusammen, wie geht\'s euch heute?“ mit diesem Dienst.' : 'Übersetzt „Hello everyone, how is the run going?“ ins Deutsche mit diesem Dienst.';
   }
-  document.getElementById('tr-desc')!.textContent = info.desc;
-  document.getElementById('tr-url-desc')!.textContent = info.urlDesc ?? '';
-  document.getElementById('tr-key-desc')!.textContent = info.key ?? '';
-  document.getElementById('tr-model-desc')!.textContent = info.modelDesc ?? '';
-  (document.getElementById('tr-url') as HTMLInputElement).placeholder = info.url ?? '';
-  (document.getElementById('tr-model') as HTMLInputElement).placeholder = info.model ?? '';
 }
 
 function setupTranslatorSettings(): void {
-  document.getElementById('tr-service')!.addEventListener('change', () => {
-    updateTranslatorSettings();
-    document.getElementById('tr-test-out')!.textContent = 'Übersetzt „Hallo zusammen, wie geht\'s euch heute?“ mit dem gewählten Dienst.';
-  });
-  document.getElementById('btn-tr-test')!.addEventListener('click', async () => {
-    const out = document.getElementById('tr-test-out')!;
-    out.textContent = 'Wird übersetzt …';
-    // Erst die gerade getippten Werte übernehmen
-    const val = (id: string) => (document.getElementById(id) as HTMLInputElement | HTMLSelectElement).value;
-    await api.updateSettings({ translateService: val('tr-service'), translateUrl: val('tr-url'), translateKey: val('tr-key'), translateModel: val('tr-model') } as Partial<AppSettings>);
-    const to = state?.settings.translateTo && state.settings.translateTo !== 'auto' ? state.settings.translateTo : 'en';
-    const r = await api.translate("Hallo zusammen, wie geht's euch heute?", 'de', to);
-    out.textContent = r.ok ? `✓ ${r.service}: „${r.text}“` : `✗ ${r.error ?? 'Fehler'}`;
-    out.classList.toggle('tr-ok', r.ok);
-    out.classList.toggle('tr-err', !r.ok);
-  });
+  for (const sel of document.querySelectorAll<HTMLSelectElement>('#settings .tr-service')) {
+    sel.addEventListener('change', () => {
+      const out = document.getElementById(`${sel.dataset.pre}-test-out`)!;
+      delete out.dataset.result;
+      out.classList.remove('tr-ok', 'tr-err');
+      updateTranslatorSettings();
+    });
+  }
+  for (const btn of document.querySelectorAll<HTMLButtonElement>('#settings .tr-test')) {
+    btn.addEventListener('click', async () => {
+      const pre = btn.dataset.pre!;
+      const out = document.getElementById(`${pre}-test-out`)!;
+      out.dataset.result = '1';
+      out.textContent = 'Wird übersetzt …';
+      const val = (id: string) => (document.getElementById(id) as HTMLInputElement | HTMLSelectElement).value;
+      // Erst die gerade getippten Werte übernehmen
+      const k = pre === 'tr' ? 'translate' : 'translateIn';
+      await api.updateSettings({ [`${k}Service`]: val(`${pre}-service`), [`${k}Url`]: val(`${pre}-url`), [`${k}Key`]: val(`${pre}-key`), [`${k}Model`]: val(`${pre}-model`) } as Partial<AppSettings>);
+      const r = pre === 'tr'
+        ? await api.translate("Hallo zusammen, wie geht's euch heute?", 'de', state?.settings.translateTo && state.settings.translateTo !== 'auto' ? state.settings.translateTo : 'en', false, 'out')
+        : await api.translate('Hello everyone, how is the run going?', 'en', 'de', true, 'in');
+      out.textContent = r.ok ? `✓ ${r.service}: „${r.text}“` : `✗ ${r.error ?? 'Fehler'}`;
+      out.classList.toggle('tr-ok', r.ok);
+      out.classList.toggle('tr-err', !r.ok);
+    });
+  }
 }
 
 function syncSettingsForm(): void {

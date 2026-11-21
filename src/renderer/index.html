@@ -105,6 +105,7 @@
       <nav class="st-nav" id="st-nav">
         <button type="button" class="st-nav-btn" data-sec="st-streams"><span class="st-ico" data-icon="volume"></span>Streams &amp; Ton</button>
         <button type="button" class="st-nav-btn" data-sec="st-chat"><span class="st-ico" data-icon="chat"></span>Chat &amp; Schnellleiste</button>
+        <button type="button" class="st-nav-btn" data-sec="st-translate"><span class="st-ico" data-icon="globe"></span>Übersetzer</button>
         <button type="button" class="st-nav-btn" data-sec="st-gw"><span class="st-ico" data-icon="gift"></span>Giveaways &amp; Raids</button>
         <button type="button" class="st-nav-btn" data-sec="st-points"><span class="st-ico" data-icon="coin"></span>Kanalpunkte &amp; Drops</button>
         <button type="button" class="st-nav-btn" data-sec="st-notifs"><span class="st-ico" data-icon="bell"></span>Benachrichtigungen &amp; Anzeige</button>
@@ -137,9 +138,16 @@
         <div class="st-card">
           <div class="st-row"><span class="st-text"><span class="st-title">Schnellnachrichten</span><span class="st-desc">Knöpfe, die eine fertige Nachricht in den Chat schreiben.</span></span>
             <button type="button" class="btn small" id="btn-quick">Bearbeiten …</button></div>
+          <div class="st-row"><span class="st-text"><span class="st-title">Chat-Verlauf</span><span class="st-desc">↑ im leeren Chat-Eingabefeld zeigt, was du schon geschrieben hast. Leeren kannst du ihn direkt in der Liste.</span></span></div>
+        </div>
+      </section>
+      <section class="st-sec" id="st-translate" data-title="Übersetzer">
+        <h3><span class="st-ico" data-icon="globe"></span>Übersetzer</h3>
+        <p class="st-intro">Eingabe und Chat haben jeweils einen eigenen Dienst – so kannst du z. B. deine eigenen Nachrichten mit einer KI übersetzen lassen und den viel häufigeren Chat kostenlos oder lokal.</p>
+        <h4 class="st-sub">Eingabe – deine Nachrichten</h4>
+        <div class="st-card">
           <label class="st-row"><span class="st-text"><span class="st-title">Eingabe übersetzen</span><span class="st-desc">Was du auf Deutsch schreibst, geht übersetzt in den Chat, wenn der Kanal eine andere Sprache hat. Pro Kanal schaltbar über „DE→EN“ in der Schnellleiste. Befehle (!…, /…) bleiben unverändert.</span></span><input type="checkbox" class="switch" data-setting="translateChat"></label>
-          <label class="st-row"><span class="st-text"><span class="st-title">Chat übersetzen</span><span class="st-desc">Fremdsprachige Nachrichten der anderen bekommen klein darunter eine deutsche Übersetzung – nur im gerade sichtbaren Stream, höchstens 20 pro Minute (schont das Kontingent des Dienstes). Pro Kanal schaltbar über „EN→DE“.</span></span><input type="checkbox" class="switch" data-setting="translateIncoming"></label>
-          <label class="st-row"><span class="st-text"><span class="st-title">Eingabe übersetzen in</span><span class="st-desc">„Sprache des Kanals“ nimmt, was der Streamer bei Twitch eingestellt hat. Der Chat wird immer ins Deutsche übersetzt.</span></span>
+          <label class="st-row"><span class="st-text"><span class="st-title">Übersetzen in</span><span class="st-desc">„Sprache des Kanals“ nimmt, was der Streamer bei Twitch eingestellt hat.</span></span>
             <select data-setting="translateTo">
               <option value="auto">Sprache des Kanals</option>
               <option value="en">Englisch</option>
@@ -154,7 +162,7 @@
               <option value="ja">Japanisch</option>
             </select></label>
           <label class="st-row"><span class="st-text"><span class="st-title">Übersetzungsdienst</span><span class="st-desc" id="tr-desc"></span></span>
-            <select data-setting="translateService" id="tr-service">
+            <select data-setting="translateService" id="tr-service" class="tr-service" data-pre="tr">
               <option value="mymemory">MyMemory (kostenlos)</option>
               <option value="deepl">DeepL</option>
               <option value="libre">LibreTranslate</option>
@@ -162,15 +170,37 @@
               <option value="openai">KI-API (OpenAI-kompatibel)</option>
               <option value="anthropic">KI-API (Claude)</option>
             </select></label>
-          <label class="st-row tr-opt" data-for="libre ollama openai"><span class="st-text"><span class="st-title">Adresse</span><span class="st-desc" id="tr-url-desc"></span></span>
+          <label class="st-row tr-opt" data-pre="tr" data-for="libre ollama openai"><span class="st-text"><span class="st-title">Adresse</span><span class="st-desc" id="tr-url-desc"></span></span>
             <input type="text" class="st-input" data-setting="translateUrl" id="tr-url" autocomplete="off" spellcheck="false"></label>
-          <label class="st-row tr-opt" data-for="deepl libre openai anthropic"><span class="st-text"><span class="st-title">API-Schlüssel</span><span class="st-desc" id="tr-key-desc"></span></span>
+          <label class="st-row tr-opt" data-pre="tr" data-for="deepl libre openai anthropic"><span class="st-text"><span class="st-title">API-Schlüssel</span><span class="st-desc" id="tr-key-desc"></span></span>
             <input type="password" class="st-input" data-setting="translateKey" id="tr-key" autocomplete="off" spellcheck="false"></label>
-          <label class="st-row tr-opt" data-for="ollama openai anthropic"><span class="st-text"><span class="st-title">Modell</span><span class="st-desc" id="tr-model-desc"></span></span>
+          <label class="st-row tr-opt" data-pre="tr" data-for="ollama openai anthropic"><span class="st-text"><span class="st-title">Modell</span><span class="st-desc" id="tr-model-desc"></span></span>
             <input type="text" class="st-input" data-setting="translateModel" id="tr-model" autocomplete="off" spellcheck="false"></label>
-          <div class="st-row"><span class="st-text"><span class="st-title">Übersetzer testen</span><span class="st-desc" id="tr-test-out">Übersetzt „Hallo zusammen, wie geht's euch heute?“ mit dem gewählten Dienst.</span></span>
-            <button type="button" class="btn small" id="btn-tr-test">Testen</button></div>
-          <div class="st-row"><span class="st-text"><span class="st-title">Chat-Verlauf</span><span class="st-desc">↑ im leeren Chat-Eingabefeld zeigt, was du schon geschrieben hast. Leeren kannst du ihn direkt in der Liste.</span></span></div>
+          <div class="st-row"><span class="st-text"><span class="st-title">Testen</span><span class="st-desc tr-test-out" id="tr-test-out"></span></span>
+            <button type="button" class="btn small tr-test" data-pre="tr">Testen</button></div>
+        </div>
+        <h4 class="st-sub">Chat – Nachrichten der anderen</h4>
+        <div class="st-card">
+          <label class="st-row"><span class="st-text"><span class="st-title">Chat übersetzen</span><span class="st-desc">Fremdsprachige Nachrichten bekommen klein darunter eine deutsche Übersetzung – nur im gerade sichtbaren Stream, höchstens 20 pro Minute. Pro Kanal schaltbar über „EN→DE“.</span></span><input type="checkbox" class="switch" data-setting="translateIncoming"></label>
+          <label class="st-row"><span class="st-text"><span class="st-title">Übersetzungsdienst</span><span class="st-desc" id="trin-desc"></span></span>
+            <select data-setting="translateInService" id="trin-service" class="tr-service" data-pre="trin">
+              <option value="same">Wie bei der Eingabe</option>
+              <option value="mymemory">MyMemory (kostenlos)</option>
+              <option value="deepl">DeepL</option>
+              <option value="libre">LibreTranslate</option>
+              <option value="ollama">Lokale KI (Ollama)</option>
+              <option value="openai">KI-API (OpenAI-kompatibel)</option>
+              <option value="anthropic">KI-API (Claude)</option>
+            </select></label>
+          <label class="st-row tr-opt" data-pre="trin" data-for="libre ollama openai"><span class="st-text"><span class="st-title">Adresse</span><span class="st-desc" id="trin-url-desc"></span></span>
+            <input type="text" class="st-input" data-setting="translateInUrl" id="trin-url" autocomplete="off" spellcheck="false"></label>
+          <label class="st-row tr-opt" data-pre="trin" data-for="deepl libre openai anthropic"><span class="st-text"><span class="st-title">API-Schlüssel</span><span class="st-desc" id="trin-key-desc"></span></span>
+            <input type="password" class="st-input" data-setting="translateInKey" id="trin-key" autocomplete="off" spellcheck="false"></label>
+          <label class="st-row tr-opt" data-pre="trin" data-for="ollama openai anthropic"><span class="st-text"><span class="st-title">Modell</span><span class="st-desc" id="trin-model-desc"></span></span>
+            <input type="text" class="st-input" data-setting="translateInModel" id="trin-model" autocomplete="off" spellcheck="false"></label>
+          <div class="st-row"><span class="st-text"><span class="st-title">Testen</span><span class="st-desc tr-test-out" id="trin-test-out"></span></span>
+            <button type="button" class="btn small tr-test" data-pre="trin">Testen</button></div>
+          <p class="st-warn">Kosten: Der Chat wird viel öfter übersetzt als deine Eingabe (bis zu 20 Nachrichten pro Minute, das sind bis zu ~1.200 Anfragen pro Stunde). Bei bezahlten KI-APIs lieber hier MyMemory, DeepL Free oder eine lokale KI (Ollama, LM Studio) wählen.</p>
         </div>
       </section>
       <section class="st-sec" id="st-gw" data-title="Giveaways &amp; Raids">

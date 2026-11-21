@@ -1100,3 +1100,7 @@ input.switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2
 #tr-test-out.tr-err { color: #ff9b8a; }
 .qb-tr-wrap { display: inline-flex; gap: 6px; flex: none; }
 .qb-tr-in.is-on { border-color: rgba(120, 220, 160, .6); background: rgba(40, 150, 90, .35); }
+.st-sub { margin: 16px 0 0; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.st-sub:first-of-type { margin-top: 10px; }
+.tr-test-out.tr-ok { color: #7ee2a8; }
+.tr-test-out.tr-err { color: #ff9b8a; }

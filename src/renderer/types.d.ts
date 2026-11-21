@@ -53,6 +53,10 @@ interface AppSettings {
   translateUrl: string;
   translateKey: string;
   translateModel: string;
+  translateInService: string;
+  translateInUrl: string;
+  translateInKey: string;
+  translateInModel: string;
 }
 
 interface QuickMessage {
@@ -193,7 +197,7 @@ interface KanalwacheApi {
   openExternal(url: string): Promise<void>;
   notifsRefresh(): Promise<void>;
   relation(login: string): Promise<ChannelRelation | null>;
-  translate(text: string, from: string, to: string, detect?: boolean): Promise<{ ok: boolean; text?: string; service?: string; error?: string }>;
+  translate(text: string, from: string, to: string, detect?: boolean, kind?: 'out' | 'in'): Promise<{ ok: boolean; text?: string; service?: string; error?: string }>;
   channelLanguage(login: string): Promise<string | null>;
   setFollow(id: string, follow: boolean): Promise<{ ok: boolean; fallback?: boolean; error?: string }>;
   dropsNotify(title: string, body: string): Promise<void>;

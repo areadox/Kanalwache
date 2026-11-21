@@ -116,11 +116,11 @@ Nach der Anmeldung holt Kanalwache alle 2 Minuten die Benachrichtigungen deines 
 
 **Eingabe übersetzen:** Schreibst du auf Deutsch in einem Kanal, dessen Sprache bei Twitch nicht Deutsch ist (z. B. Englisch), übersetzt Kanalwache deine Nachricht beim Senden und schreibt die Übersetzung in den Chat. Darunter erscheint kurz „Übersetzt (EN): …“.
 
-- **Chat übersetzen** (getrennt einschaltbar, Einstellungen → *Chat & Schnellleiste*): Fremdsprachige Nachrichten der anderen bekommen klein darunter eine deutsche Übersetzung (🌐 …). Nur im gerade sichtbaren Stream und höchstens 20 Übersetzungen pro Minute – bei schnellem Chat werden nur die neuesten übersetzt, damit das Kontingent des Dienstes reicht. Befehle, Emotes und sehr kurze Nachrichten werden übersprungen. Pro Kanal schaltbar über **EN→DE** in der Schnellleiste.
+- **Chat übersetzen** (getrennt einschaltbar, Einstellungen → *Übersetzer*): Fremdsprachige Nachrichten der anderen bekommen klein darunter eine deutsche Übersetzung (🌐 …). Nur im gerade sichtbaren Stream und höchstens 20 Übersetzungen pro Minute – bei schnellem Chat werden nur die neuesten übersetzt, damit das Kontingent des Dienstes reicht. Befehle, Emotes und sehr kurze Nachrichten werden übersprungen. Pro Kanal schaltbar über **EN→DE** in der Schnellleiste.
 - **DE→EN** in der Schnellleiste zeigt, dass der Übersetzer in diesem Kanal aktiv ist; ein Klick schaltet ihn für den Kanal aus (durchgestrichen) und wieder an. Bei deutschsprachigen Kanälen ist der Knopf ausgeblendet.
 - Befehle (`!join`, `/me` …) werden nie übersetzt. Nachrichten aus dem Chat-Verlauf (↑) werden beim erneuten Senden ebenfalls übersetzt.
 - Klappt die Übersetzung nicht, steht deine Nachricht wieder im Eingabefeld – nichts geht unübersetzt raus.
-- Einstellungen → *Chat & Schnellleiste*: Übersetzer an/aus, Zielsprache („Sprache des Kanals“ oder fest, z. B. Englisch) und der **Übersetzungsdienst** – mit **Testen**-Knopf:
+- Einstellungen → *Übersetzer*: zwei Bereiche – **Eingabe** (deine Nachrichten: an/aus, Zielsprache, Dienst) und **Chat** (Nachrichten der anderen: an/aus, Dienst oder „Wie bei der Eingabe“). So kannst du z. B. deine Eingabe mit einer KI übersetzen und den viel häufigeren Chat kostenlos oder lokal – wegen der Kosten. Jeder Bereich hat einen **Testen**-Knopf. Dienste:
 
   | Dienst | Was du brauchst |
   |---|---|

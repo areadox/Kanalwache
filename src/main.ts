@@ -998,6 +998,10 @@ function registerIpc(): void {
     if (typeof p.translateUrl === 'string') s.translateUrl = p.translateUrl.trim().slice(0, 300);
     if (typeof p.translateKey === 'string') s.translateKey = p.translateKey.trim().slice(0, 300);
     if (typeof p.translateModel === 'string') s.translateModel = p.translateModel.trim().slice(0, 120);
+    if (typeof p.translateInService === 'string' && /^(same|mymemory|deepl|libre|ollama|openai|anthropic)$/.test(p.translateInService)) s.translateInService = p.translateInService;
+    if (typeof p.translateInUrl === 'string') s.translateInUrl = p.translateInUrl.trim().slice(0, 300);
+    if (typeof p.translateInKey === 'string') s.translateInKey = p.translateInKey.trim().slice(0, 300);
+    if (typeof p.translateInModel === 'string') s.translateInModel = p.translateInModel.trim().slice(0, 120);
     if (typeof p.translateTo === 'string' && /^(auto|[a-z]{2})$/.test(p.translateTo)) s.translateTo = p.translateTo;
     applyAutostart();
     if (p.syncFollows === true) void syncFollows();
@@ -1149,15 +1153,18 @@ function registerIpc(): void {
     n.show();
   });
 
-  ipcMain.handle('translate', async (_e, text: unknown, from: unknown, to: unknown, detect: unknown) => {
+  ipcMain.handle('translate', async (_e, text: unknown, from: unknown, to: unknown, detect: unknown, kind: unknown) => {
     if (typeof text !== 'string' || typeof from !== 'string' || typeof to !== 'string' || !/^[a-z]{2}$/.test(from) || !/^[a-z]{2}$/.test(to)) return { ok: false, error: 'Ungültig.' };
     const s = store.config.settings;
-    const service = s.translateService as TranslateService;
+    // Chat (eingehend) hat einen eigenen Dienst – außer er steht auf „wie bei der Eingabe“
+    const own = kind === 'in' && s.translateInService !== 'same';
+    const service = (own ? s.translateInService : s.translateService) as TranslateService;
+    const key = own ? s.translateInKey : s.translateKey;
     return translateText(text.slice(0, 500), from, to, {
       service,
-      key: service === 'deepl' ? s.translateKey || s.deeplKey : s.translateKey,
-      url: s.translateUrl,
-      model: s.translateModel,
+      key: service === 'deepl' ? key || s.deeplKey : key,
+      url: own ? s.translateInUrl : s.translateUrl,
+      model: own ? s.translateInModel : s.translateModel,
     }, detect === true);
   });
   ipcMain.handle('channel-language', async (_e, login: unknown) => {

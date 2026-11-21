@@ -68,6 +68,11 @@ export interface Settings {
   translateUrl: string;
   translateKey: string;
   translateModel: string;
+  /** Eigener Dienst für „Chat übersetzen“ – „same“ = wie bei der Eingabe */
+  translateInService: string;
+  translateInUrl: string;
+  translateInKey: string;
+  translateInModel: string;
 }
 
 export interface QuickMessage {
@@ -150,6 +155,10 @@ export const DEFAULT_SETTINGS: Settings = {
   translateUrl: '',
   translateKey: '',
   translateModel: '',
+  translateInService: 'same',
+  translateInUrl: '',
+  translateInKey: '',
+  translateInModel: '',
 };
 
 const LOGIN_RE = /^[a-z0-9_]{2,25}$/;
