@@ -48,6 +48,10 @@ interface AppSettings {
   translateChat: boolean;
   translateTo: string;
   deeplKey: string;
+  translateService: string;
+  translateUrl: string;
+  translateKey: string;
+  translateModel: string;
 }
 
 interface QuickMessage {

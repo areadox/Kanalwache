@@ -119,7 +119,18 @@ Schreibst du auf Deutsch in einem Kanal, dessen Sprache bei Twitch nicht Deutsch
 - **DE→EN** in der Schnellleiste zeigt, dass der Übersetzer in diesem Kanal aktiv ist; ein Klick schaltet ihn für den Kanal aus (durchgestrichen) und wieder an. Bei deutschsprachigen Kanälen ist der Knopf ausgeblendet.
 - Befehle (`!join`, `/me` …) werden nie übersetzt. Nachrichten aus dem Chat-Verlauf (↑) werden beim erneuten Senden ebenfalls übersetzt.
 - Klappt die Übersetzung nicht, steht deine Nachricht wieder im Eingabefeld – nichts geht unübersetzt raus.
-- Einstellungen → *Chat & Schnellleiste*: Übersetzer an/aus, Zielsprache („Sprache des Kanals“ oder fest, z. B. Englisch) und optional ein **DeepL-API-Schlüssel**. Ohne Schlüssel übersetzt der kostenlose Dienst MyMemory (begrenzt auf einige tausend Zeichen am Tag); mit einem kostenlosen „DeepL API Free“-Schlüssel ist die Übersetzung besser. Die Nachricht geht dazu an den jeweiligen Dienst.
+- Einstellungen → *Chat & Schnellleiste*: Übersetzer an/aus, Zielsprache („Sprache des Kanals“ oder fest, z. B. Englisch) und der **Übersetzungsdienst** – mit **Testen**-Knopf:
+
+  | Dienst | Was du brauchst |
+  |---|---|
+  | MyMemory (Standard) | nichts – kostenlos, aber begrenzt (einige tausend Zeichen am Tag) und eher wörtlich |
+  | DeepL | API-Schlüssel von deepl.com („DeepL API Free“ ist kostenlos) |
+  | LibreTranslate | Adresse deines eigenen Servers, ggf. Schlüssel |
+  | Lokale KI – Ollama | [Ollama](https://ollama.com) auf deinem PC + Modellname (z. B. `llama3.1`) – nichts verlässt den Rechner |
+  | KI-API – OpenAI-kompatibel | Adresse, Schlüssel, Modell – OpenAI, OpenRouter, Groq, Mistral … oder lokal LM Studio (`http://localhost:1234/v1`, ohne Schlüssel) |
+  | KI-API – Claude (Anthropic) | API-Schlüssel aus der Claude Console + Modellname |
+
+  Außer bei Ollama/LM Studio auf deinem PC geht die Nachricht zum Übersetzen an den gewählten Dienst.
 
 ## Chat-Verlauf
 

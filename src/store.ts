@@ -58,8 +58,14 @@ export interface Settings {
   translateChat: boolean;
   /** Zielsprache: „auto“ = Sprache des Kanals laut Twitch, sonst fester Code (z. B. „en“) */
   translateTo: string;
-  /** Optional: eigener DeepL-API-Schlüssel (sonst kostenloser Dienst MyMemory) */
+  /** Optional: eigener DeepL-API-Schlüssel */
   deeplKey: string;
+  /** Übersetzungsdienst: mymemory, deepl, libre, ollama, openai (OpenAI-kompatibel), anthropic */
+  translateService: string;
+  /** Adresse (LibreTranslate, Ollama, OpenAI-kompatibel), Schlüssel und Modell für den gewählten Dienst */
+  translateUrl: string;
+  translateKey: string;
+  translateModel: string;
 }
 
 export interface QuickMessage {
@@ -137,6 +143,10 @@ export const DEFAULT_SETTINGS: Settings = {
   translateChat: true,
   translateTo: 'auto',
   deeplKey: '',
+  translateService: 'mymemory',
+  translateUrl: '',
+  translateKey: '',
+  translateModel: '',
 };
 
 const LOGIN_RE = /^[a-z0-9_]{2,25}$/;

@@ -3647,6 +3647,7 @@ function setupSettings(): void {
   dialog.addEventListener('close', () => {
     if (search.value) { search.value = ''; search.dispatchEvent(new Event('input')); }
   });
+  setupTranslatorSettings();
   for (const el of dialog.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-setting]')) {
     el.addEventListener('change', () => {
       const key = el.dataset.setting as keyof AppSettings;
@@ -3654,6 +3655,50 @@ function setupSettings(): void {
       void api.updateSettings({ [key]: value } as Partial<AppSettings>);
     });
   }
+}
+
+const TR_INFO: Record<string, { desc: string; url?: string; urlDesc?: string; key?: string; model?: string; modelDesc?: string }> = {
+  mymemory: { desc: 'Kostenlos und ohne Anmeldung, aber begrenzt (einige tausend Zeichen am Tag) und eher wörtlich.' },
+  deepl: { desc: 'Sehr gute Übersetzungen. „DeepL API Free“ ist kostenlos (500.000 Zeichen im Monat) – Schlüssel auf deepl.com.', key: 'Schlüssel von deepl.com (Free-Schlüssel enden auf „:fx“)' },
+  libre: { desc: 'Freie Übersetzungs-Software, z. B. selbst betrieben per Docker.', url: 'http://localhost:5000', urlDesc: 'Adresse deines LibreTranslate-Servers', key: 'Nur nötig, wenn dein Server einen verlangt' },
+  ollama: { desc: 'Läuft komplett auf deinem PC – nichts verlässt den Rechner. Ollama installieren und ein Modell laden (z. B. „ollama pull llama3.1“).', url: 'http://localhost:11434', urlDesc: 'Adresse von Ollama (Standard: http://localhost:11434)', model: 'llama3.1', modelDesc: 'Name des Modells, wie in „ollama list“' },
+  openai: { desc: 'OpenAI oder jeder Dienst mit OpenAI-kompatibler Schnittstelle: z. B. OpenRouter, Groq, Mistral – oder lokal LM Studio (http://localhost:1234/v1).', url: 'https://api.openai.com/v1', urlDesc: 'Basis-Adresse bis einschließlich /v1', key: 'API-Schlüssel des Dienstes (bei LM Studio leer lassen)', model: 'gpt-4o-mini', modelDesc: 'Modellname beim Dienst' },
+  anthropic: { desc: 'Claude über die Anthropic-API – Schlüssel aus der Claude Console (console.anthropic.com).', key: 'API-Schlüssel („sk-ant-…“)', model: 'claude-haiku-5-5', modelDesc: 'Modellname, z. B. claude-haiku-5-5' },
+};
+
+function updateTranslatorSettings(): void {
+  const sel = document.getElementById('tr-service') as HTMLSelectElement | null;
+  if (!sel) return;
+  const svc = sel.value || 'mymemory';
+  const info = TR_INFO[svc] ?? TR_INFO.mymemory;
+  for (const row of document.querySelectorAll<HTMLElement>('#settings .tr-opt')) {
+    row.classList.toggle('tr-hidden', !(row.dataset.for ?? '').split(' ').includes(svc));
+  }
+  document.getElementById('tr-desc')!.textContent = info.desc;
+  document.getElementById('tr-url-desc')!.textContent = info.urlDesc ?? '';
+  document.getElementById('tr-key-desc')!.textContent = info.key ?? '';
+  document.getElementById('tr-model-desc')!.textContent = info.modelDesc ?? '';
+  (document.getElementById('tr-url') as HTMLInputElement).placeholder = info.url ?? '';
+  (document.getElementById('tr-model') as HTMLInputElement).placeholder = info.model ?? '';
+}
+
+function setupTranslatorSettings(): void {
+  document.getElementById('tr-service')!.addEventListener('change', () => {
+    updateTranslatorSettings();
+    document.getElementById('tr-test-out')!.textContent = 'Übersetzt „Hallo zusammen, wie geht\'s euch heute?“ mit dem gewählten Dienst.';
+  });
+  document.getElementById('btn-tr-test')!.addEventListener('click', async () => {
+    const out = document.getElementById('tr-test-out')!;
+    out.textContent = 'Wird übersetzt …';
+    // Erst die gerade getippten Werte übernehmen
+    const val = (id: string) => (document.getElementById(id) as HTMLInputElement | HTMLSelectElement).value;
+    await api.updateSettings({ translateService: val('tr-service'), translateUrl: val('tr-url'), translateKey: val('tr-key'), translateModel: val('tr-model') } as Partial<AppSettings>);
+    const to = state?.settings.translateTo && state.settings.translateTo !== 'auto' ? state.settings.translateTo : 'en';
+    const r = await api.translate("Hallo zusammen, wie geht's euch heute?", 'de', to);
+    out.textContent = r.ok ? `✓ ${r.service}: „${r.text}“` : `✗ ${r.error ?? 'Fehler'}`;
+    out.classList.toggle('tr-ok', r.ok);
+    out.classList.toggle('tr-err', !r.ok);
+  });
 }
 
 function syncSettingsForm(): void {
@@ -3664,8 +3709,9 @@ function syncSettingsForm(): void {
   for (const el of dialog.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-setting]')) {
     const v = state.settings[el.dataset.setting as keyof AppSettings];
     if (el instanceof HTMLInputElement && el.type === 'checkbox') el.checked = !!v;
-    else el.value = String(v);
+    else el.value = v == null ? (el instanceof HTMLSelectElement ? el.options[0]?.value ?? "" : "") : String(v);
   }
+  updateTranslatorSettings();
   const acc = document.getElementById('settings-account')!;
   acc.replaceChildren(
     h('div', { class: 'st-row' },

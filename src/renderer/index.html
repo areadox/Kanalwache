@@ -152,8 +152,23 @@
               <option value="ru">Russisch</option>
               <option value="ja">Japanisch</option>
             </select></label>
-          <label class="st-row"><span class="st-text"><span class="st-title">DeepL-API-Schlüssel <span class="muted">(optional)</span></span><span class="st-desc">Ohne Schlüssel übersetzt der kostenlose Dienst MyMemory (einige tausend Zeichen am Tag). Mit einem kostenlosen „DeepL API Free“-Schlüssel wird es besser. Deine Nachrichten gehen dazu an den jeweiligen Dienst.</span></span>
-            <input type="password" class="st-input" data-setting="deeplKey" placeholder="xxxxxxxx-…:fx" autocomplete="off" spellcheck="false"></label>
+          <label class="st-row"><span class="st-text"><span class="st-title">Übersetzungsdienst</span><span class="st-desc" id="tr-desc"></span></span>
+            <select data-setting="translateService" id="tr-service">
+              <option value="mymemory">MyMemory (kostenlos, ohne Anmeldung)</option>
+              <option value="deepl">DeepL (API-Schlüssel)</option>
+              <option value="libre">LibreTranslate (eigener Server)</option>
+              <option value="ollama">Lokale KI – Ollama</option>
+              <option value="openai">KI-API – OpenAI-kompatibel</option>
+              <option value="anthropic">KI-API – Claude (Anthropic)</option>
+            </select></label>
+          <label class="st-row tr-opt" data-for="libre ollama openai"><span class="st-text"><span class="st-title">Adresse</span><span class="st-desc" id="tr-url-desc"></span></span>
+            <input type="text" class="st-input" data-setting="translateUrl" id="tr-url" autocomplete="off" spellcheck="false"></label>
+          <label class="st-row tr-opt" data-for="deepl libre openai anthropic"><span class="st-text"><span class="st-title">API-Schlüssel</span><span class="st-desc" id="tr-key-desc"></span></span>
+            <input type="password" class="st-input" data-setting="translateKey" id="tr-key" autocomplete="off" spellcheck="false"></label>
+          <label class="st-row tr-opt" data-for="ollama openai anthropic"><span class="st-text"><span class="st-title">Modell</span><span class="st-desc" id="tr-model-desc"></span></span>
+            <input type="text" class="st-input" data-setting="translateModel" id="tr-model" autocomplete="off" spellcheck="false"></label>
+          <div class="st-row"><span class="st-text"><span class="st-title">Übersetzer testen</span><span class="st-desc" id="tr-test-out">Übersetzt „Hallo zusammen, wie geht's euch heute?“ mit dem gewählten Dienst.</span></span>
+            <button type="button" class="btn small" id="btn-tr-test">Testen</button></div>
           <div class="st-row"><span class="st-text"><span class="st-title">Chat-Verlauf</span><span class="st-desc">↑ im leeren Chat-Eingabefeld zeigt, was du schon geschrieben hast. Leeren kannst du ihn direkt in der Liste.</span></span></div>
         </div>
       </section>

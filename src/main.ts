@@ -8,7 +8,7 @@ import { ChannelStatus, fetchFollows, fetchModChannels, fetchStatuses, FollowedC
 import { fetchTwitchNotifications, TwitchNotification } from './notifications';
 import { fetchRelation, setFollow } from './relation';
 import { fetchLanguages, fetchStreaks } from './streaks';
-import { translateText } from './translate';
+import { translateText, TranslateService } from './translate';
 import { TwitchChat } from './chat';
 import { analyzeAnnouncement, ENTRY_RE, Giveaway, GiveawayDetector } from './giveaway';
 import { compileRules, CompiledRules, DEFAULT_RULES, sanitizeRules } from './rules';
@@ -994,6 +994,10 @@ function registerIpc(): void {
     if (typeof p.pollSeconds === 'number') s.pollSeconds = clampPoll(p.pollSeconds);
     if (p.recordQuality === 'high' || p.recordQuality === 'medium' || p.recordQuality === 'low') s.recordQuality = p.recordQuality;
     if (typeof p.deeplKey === 'string') s.deeplKey = p.deeplKey.trim().slice(0, 100);
+    if (typeof p.translateService === 'string' && /^(mymemory|deepl|libre|ollama|openai|anthropic)$/.test(p.translateService)) s.translateService = p.translateService;
+    if (typeof p.translateUrl === 'string') s.translateUrl = p.translateUrl.trim().slice(0, 300);
+    if (typeof p.translateKey === 'string') s.translateKey = p.translateKey.trim().slice(0, 300);
+    if (typeof p.translateModel === 'string') s.translateModel = p.translateModel.trim().slice(0, 120);
     if (typeof p.translateTo === 'string' && /^(auto|[a-z]{2})$/.test(p.translateTo)) s.translateTo = p.translateTo;
     applyAutostart();
     if (p.syncFollows === true) void syncFollows();
@@ -1147,7 +1151,14 @@ function registerIpc(): void {
 
   ipcMain.handle('translate', async (_e, text: unknown, from: unknown, to: unknown) => {
     if (typeof text !== 'string' || typeof from !== 'string' || typeof to !== 'string' || !/^[a-z]{2}$/.test(from) || !/^[a-z]{2}$/.test(to)) return { ok: false, error: 'Ungültig.' };
-    return translateText(text.slice(0, 500), from, to, store.config.settings.deeplKey ?? '');
+    const s = store.config.settings;
+    const service = s.translateService as TranslateService;
+    return translateText(text.slice(0, 500), from, to, {
+      service,
+      key: service === 'deepl' ? s.translateKey || s.deeplKey : s.translateKey,
+      url: s.translateUrl,
+      model: s.translateModel,
+    });
   });
   ipcMain.handle('channel-language', async (_e, login: unknown) => {
     if (typeof login !== 'string' || !/^[a-z0-9_]{2,25}$/.test(login) || !authToken) return null;
