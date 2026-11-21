@@ -844,7 +844,7 @@ main { position: relative; }
   flex: none;
 }
 .quickbar {
-  display: flex; align-items: center; gap: 8px; min-height: 46px; padding: 8px 10px; flex: none;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-height: 46px; padding: 8px 10px; flex: none;
   background: #121217; border-top: 1px solid var(--line);
 }
 .qb-mute {
@@ -858,7 +858,7 @@ main { position: relative; }
 .qb-vol { width: 96px; flex: none; accent-color: var(--accent); }
 .qb-sep { width: 1px; height: 24px; background: var(--line); flex: none; }
 /* Nachrichten brechen in eine weitere Zeile um, statt aus dem Bild geschoben zu werden */
-.qb-msgs { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; flex: 1; min-width: 0; }
+.qb-msgs { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; flex: 1 1 260px; min-width: 0; }
 .qb-msg {
   position: relative; flex: none; height: 30px; padding: 0 12px; max-width: 180px;
   border: 1px solid rgba(180, 140, 255, .35); border-radius: 999px; background: rgba(180, 140, 255, .1);
