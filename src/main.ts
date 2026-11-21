@@ -484,8 +484,15 @@ function iconPath(): string {
   return path.join(__dirname, 'icon.png');
 }
 
+/** Fenster-Icon: unter Windows die .ico mit allen Größen – die Taskleiste nimmt sonst gern das Standard-Symbol */
+function windowIcon(): string {
+  return path.join(__dirname, process.platform === 'win32' ? 'icon.ico' : 'icon.png');
+}
+
 async function init(): Promise<void> {
-  app.setAppUserModelId('de.areadox.kanalwache');
+  // Installiert: gleiche App-ID wie die Startmenü-Verknüpfung des Installers → Taskleiste zeigt deren Icon.
+  // Portable: keine Verknüpfung mit dieser ID → ohne eigene ID nimmt Windows das Icon aus der .exe.
+  if (!process.env.PORTABLE_EXECUTABLE_FILE) app.setAppUserModelId('de.areadox.kanalwache');
   Menu.setApplicationMenu(null);
   // Twitch-Seiten sollen immer dunkel erscheinen
   nativeTheme.themeSource = 'dark';
@@ -555,7 +562,7 @@ function createWindow(): void {
     show: false,
     backgroundColor: '#0d0d10',
     title: 'Kanalwache',
-    icon: iconPath(),
+    icon: windowIcon(),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,

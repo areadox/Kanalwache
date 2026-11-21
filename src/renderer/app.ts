@@ -1776,6 +1776,9 @@ interface RaidInfo {
 const RAID_SHOW_MS = 3 * 60_000;
 /** Schon gezeigte Raids (Quelle>Ziel) – nicht doppelt melden */
 const raidSeen = new Map<string, number>();
+/** Raids, bei denen du mitraidest/mitgeraidet hast (Quelle → Ziel, Zeit) – danach keine weitere Raid-Abfrage dazu */
+const raidJoined = new Map<string, { target: string; at: number }>();
+const RAID_QUIET_MS = 30 * 60_000;
 let raidScan = false;
 
 /** Sucht in Twitchs Chat das Raid-Banner („X raidet Y …“) und liest Ziel und Knöpfe aus. */
@@ -1918,6 +1921,7 @@ const RAID_ARM_MAX_MS = 150_000;
 
 /** Raid vollziehen: erst den geraideten Kanal öffnen, dann den Tab des Raiders schließen. */
 function completeRaid(source: string, target: string, targetName: string): void {
+  raidJoined.set(source, { target: target.toLowerCase(), at: Date.now() });
   const armed = armedRaids.get(source);
   armedRaids.delete(source);
   armed?.onDone();
@@ -1953,6 +1957,9 @@ async function watchRaids(): Promise<void> {
           if (banner) { armed.bannerSeen = true; armed.bannerAt = Date.now(); }
           if (await target.executeJavaScript(`(${raidCancelScan.toString()})()`)) {
             armedRaids.delete(t.login);
+            // Nicht geklappt: spätere Raid-Abfragen dieses Kanals wieder zulassen
+            raidJoined.delete(t.login);
+            for (const k of [...raidSeen.keys()]) if (k.startsWith(`${t.login}>`)) raidSeen.delete(k);
             armed.onDone();
             toast('Der Raid wurde abgebrochen – du bleibst hier.');
             continue;
@@ -1989,6 +1996,12 @@ async function watchRaids(): Promise<void> {
 
 function showRaid(r: RaidInfo): void {
   if (!state?.settings.raidPrompt) return;
+  // Schon mitgeraidet: keine zweite Abfrage – weder vom Raider (z. B. bei Streamende) noch im Ziel-Tab zum selben Raid
+  const now = Date.now();
+  for (const [src, j] of raidJoined) if (now - j.at > RAID_QUIET_MS) raidJoined.delete(src);
+  const joined = raidJoined.get(r.source);
+  if (joined) return;
+  for (const [src, j] of raidJoined) if (j.target === r.source && r.target.toLowerCase() === src) return;
   const key = `${r.source}>${r.target.toLowerCase()}`;
   const seen = raidSeen.get(key);
   if (seen && Date.now() - seen < 30 * 60_000) {
@@ -2030,10 +2043,11 @@ function showRaid(r: RaidInfo): void {
     status.textContent = `Mitraiden zugesagt – sobald der Raid durch ist, öffnet sich ${targetName} und dieser Tab schließt sich.`;
     status.hidden = false;
     actions.replaceChildren(
-      h('button', { type: 'button', class: 'btn', text: 'Abbrechen', onclick: () => { armedRaids.delete(r.source); close(); toast('Mitraiden abgebrochen.'); } }),
+      h('button', { type: 'button', class: 'btn', text: 'Abbrechen', onclick: () => { armedRaids.delete(r.source); raidJoined.delete(r.source); close(); toast('Mitraiden abgebrochen.'); } }),
       h('button', { type: 'button', class: 'btn primary raid-go', onclick: () => completeRaid(r.source, r.target, targetName) }, icon('sword'), h('span', { text: 'Jetzt wechseln' })),
     );
     armedRaids.set(r.source, { target: r.target, targetName, at: Date.now(), onDone: () => close() });
+    raidJoined.set(r.source, { target: r.target.toLowerCase(), at: Date.now() });
     toast(`Mitraiden zugesagt – gewechselt wird, wenn der Raid durch ist.`);
   };
   const status = h('p', { class: 'raid-hint raid-wait' });

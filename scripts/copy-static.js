@@ -7,6 +7,7 @@ const copies = [
   ['src/renderer/index.html', 'dist/renderer/index.html'],
   ['src/renderer/style.css', 'dist/renderer/style.css'],
   ['build/icon.png', 'dist/icon.png'],
+  ['build/icon.ico', 'dist/icon.ico'],
   // Lizenztext für die Lizenzseite im Windows-Installer (electron-builder nimmt build/license.txt automatisch)
   ['LICENSE', 'build/license.txt'],
 ];
