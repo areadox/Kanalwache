@@ -994,11 +994,11 @@ function registerIpc(): void {
     if (typeof p.pollSeconds === 'number') s.pollSeconds = clampPoll(p.pollSeconds);
     if (p.recordQuality === 'high' || p.recordQuality === 'medium' || p.recordQuality === 'low') s.recordQuality = p.recordQuality;
     if (typeof p.deeplKey === 'string') s.deeplKey = p.deeplKey.trim().slice(0, 100);
-    if (typeof p.translateService === 'string' && /^(mymemory|deepl|libre|ollama|openai|anthropic)$/.test(p.translateService)) s.translateService = p.translateService;
+    if (typeof p.translateService === 'string' && /^(mymemory|deepl|libre|ollama|lmstudio|openai|anthropic)$/.test(p.translateService)) s.translateService = p.translateService;
     if (typeof p.translateUrl === 'string') s.translateUrl = p.translateUrl.trim().slice(0, 300);
     if (typeof p.translateKey === 'string') s.translateKey = p.translateKey.trim().slice(0, 300);
     if (typeof p.translateModel === 'string') s.translateModel = p.translateModel.trim().slice(0, 120);
-    if (typeof p.translateInService === 'string' && /^(same|mymemory|deepl|libre|ollama|openai|anthropic)$/.test(p.translateInService)) s.translateInService = p.translateInService;
+    if (typeof p.translateInService === 'string' && /^(same|mymemory|deepl|libre|ollama|lmstudio|openai|anthropic)$/.test(p.translateInService)) s.translateInService = p.translateInService;
     if (typeof p.translateInUrl === 'string') s.translateInUrl = p.translateInUrl.trim().slice(0, 300);
     if (typeof p.translateInKey === 'string') s.translateInKey = p.translateInKey.trim().slice(0, 300);
     if (typeof p.translateInModel === 'string') s.translateInModel = p.translateInModel.trim().slice(0, 120);

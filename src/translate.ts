@@ -1,6 +1,6 @@
 import { net } from 'electron';
 
-export type TranslateService = 'mymemory' | 'deepl' | 'libre' | 'ollama' | 'openai' | 'anthropic';
+export type TranslateService = 'mymemory' | 'deepl' | 'libre' | 'ollama' | 'lmstudio' | 'openai' | 'anthropic';
 
 export interface TranslateOptions {
   service: TranslateService;
@@ -33,14 +33,49 @@ function prompt(text: string, from: string, to: string, detect = false): string 
 
 /** KI-Antworten manchmal mit Anführungszeichen oder Vorspann – auf die reine Übersetzung kürzen */
 function clean(out: string): string {
-  let s = out.trim();
+  // Denkende Modelle (z. B. in LM Studio) schicken ihre Überlegungen in <think>…</think> mit
+  let s = out.replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/^[\s\S]*<\/think>/i, '').trim();
   s = s.replace(/^(translation|übersetzung)\s*:\s*/i, '');
   if (/^["„“'].*["“”']$/s.test(s) && s.length > 2) s = s.slice(1, -1).trim();
   return s.split('\n').filter((l) => l.trim()).join(' ').slice(0, 500);
 }
 
 function base(url: string, fallback: string): string {
-  return (url.trim() || fallback).replace(/\/+$/, '');
+  let u = (url.trim() || fallback).replace(/\/+$/, '');
+  if (!/^https?:\/\//i.test(u)) u = `http://${u}`;
+  // „localhost“ kann unter Windows auf IPv6 (::1) gehen, während LM Studio/Ollama nur auf 127.0.0.1 lauschen
+  return u.replace(/^(https?:\/\/)localhost(?=[:/]|$)/i, '$1127.0.0.1');
+}
+
+/** OpenAI-kompatibler Aufruf; ohne Modell wird das erste geladene Modell des Dienstes genommen (praktisch für LM Studio). */
+async function openaiChat(root: string, key: string, model: string, content: string, name: string): Promise<{ text: string; model: string }> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (key.trim()) headers.Authorization = `Bearer ${key.trim()}`;
+  let url = root;
+  const call = async (path: string, init?: RequestInit) => {
+    let res = await net.fetch(`${url}${path}`, init);
+    // Adresse ohne /v1 eingetragen? Dann mit /v1 nochmal
+    if (res.status === 404 && !/\/v\d+$/.test(url)) {
+      const alt = `${url}/v1`;
+      const res2 = await net.fetch(`${alt}${path}`, init);
+      if (res2.status !== 404) { url = alt; res = res2; }
+    }
+    return res;
+  };
+  let m = model.trim();
+  if (!m) {
+    const list = await json(await call('/models', { headers }), name);
+    m = Array.isArray(list?.data) && typeof list.data[0]?.id === 'string' ? list.data[0].id : '';
+    if (!m) throw new Error(`${name}: kein Modell geladen – in ${name} ein Modell laden oder den Modellnamen eintragen.`);
+  }
+  const j = await json(await call('/chat/completions', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ model: m, temperature: 0.2, stream: false, messages: [{ role: 'user', content }] }),
+  }), name);
+  const out = j?.choices?.[0]?.message?.content;
+  if (typeof out !== 'string' || !out.trim()) throw new Error(`${name} hat nichts zurückgegeben.`);
+  return { text: clean(out), model: m };
 }
 
 async function json(res: Response, name: string): Promise<any> {
@@ -72,7 +107,7 @@ export async function translateText(text: string, from: string, to: string, opt:
         return typeof out === 'string' && out ? { ok: true, text: out, service: 'DeepL' } : { ok: false, error: 'DeepL hat nichts zurückgegeben.' };
       }
       case 'libre': {
-        const j = await json(await net.fetch(`${base(opt.url, 'http://localhost:5000')}/translate`, {
+        const j = await json(await net.fetch(`${base(opt.url, 'http://127.0.0.1:5000')}/translate`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ q: text, source: detect ? 'auto' : src, target: dst, format: 'text', ...(opt.key.trim() ? { api_key: opt.key.trim() } : {}) }),
@@ -82,7 +117,7 @@ export async function translateText(text: string, from: string, to: string, opt:
       }
       case 'ollama': {
         if (!opt.model.trim()) return { ok: false, error: 'Ollama: kein Modell eingetragen (z. B. „llama3.1“).' };
-        const j = await json(await net.fetch(`${base(opt.url, 'http://localhost:11434')}/api/chat`, {
+        const j = await json(await net.fetch(`${base(opt.url, 'http://127.0.0.1:11434')}/api/chat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ model: opt.model.trim(), stream: false, options: { temperature: 0.2 }, messages: [{ role: 'user', content: prompt(text, src, dst, detect) }] }),
@@ -90,17 +125,14 @@ export async function translateText(text: string, from: string, to: string, opt:
         const out = j?.message?.content;
         return typeof out === 'string' && out.trim() ? { ok: true, text: clean(out), service: `Ollama (${opt.model.trim()})` } : { ok: false, error: 'Ollama hat nichts zurückgegeben.' };
       }
+      case 'lmstudio': {
+        const r = await openaiChat(base(opt.url, 'http://127.0.0.1:1234/v1'), opt.key, opt.model, prompt(text, src, dst, detect), 'LM Studio');
+        return { ok: true, text: r.text, service: `LM Studio (${r.model})` };
+      }
       case 'openai': {
-        if (!opt.model.trim()) return { ok: false, error: 'Kein Modell eingetragen.' };
-        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-        if (opt.key.trim()) headers.Authorization = `Bearer ${opt.key.trim()}`;
-        const j = await json(await net.fetch(`${base(opt.url, 'https://api.openai.com/v1')}/chat/completions`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ model: opt.model.trim(), temperature: 0.2, messages: [{ role: 'user', content: prompt(text, src, dst, detect) }] }),
-        }), 'KI-Dienst');
-        const out = j?.choices?.[0]?.message?.content;
-        return typeof out === 'string' && out.trim() ? { ok: true, text: clean(out), service: opt.model.trim() } : { ok: false, error: 'Der KI-Dienst hat nichts zurückgegeben.' };
+        if (!opt.model.trim() && !opt.url.trim()) return { ok: false, error: 'Kein Modell eingetragen.' };
+        const r = await openaiChat(base(opt.url, 'https://api.openai.com/v1'), opt.key, opt.model, prompt(text, src, dst, detect), 'KI-Dienst');
+        return { ok: true, text: r.text, service: r.model };
       }
       case 'anthropic': {
         if (!opt.key.trim()) return { ok: false, error: 'Claude: kein API-Schlüssel eingetragen.' };
@@ -123,7 +155,11 @@ export async function translateText(text: string, from: string, to: string, opt:
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    if (/ECONNREFUSED|ERR_CONNECTION_REFUSED/i.test(msg)) return { ok: false, error: `Keine Verbindung zu ${opt.url || 'dem Dienst'} – läuft er?` };
+    if (/ECONNREFUSED|ERR_CONNECTION_REFUSED|ERR_CONNECTION_RESET|ERR_ADDRESS_UNREACHABLE/i.test(msg)) {
+      if (opt.service === 'lmstudio') return { ok: false, error: `Keine Verbindung zu LM Studio (${base(opt.url, 'http://127.0.0.1:1234/v1')}). In LM Studio links „Developer“ öffnen, ein Modell laden und „Start Server“ einschalten.` };
+      if (opt.service === 'ollama') return { ok: false, error: `Keine Verbindung zu Ollama (${base(opt.url, 'http://127.0.0.1:11434')}) – läuft Ollama?` };
+      return { ok: false, error: `Keine Verbindung zu ${opt.url || 'dem Dienst'} – läuft er?` };
+    }
     return { ok: false, error: msg };
   }
 }

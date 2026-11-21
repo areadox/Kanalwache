@@ -128,7 +128,8 @@ Nach der Anmeldung holt Kanalwache alle 2 Minuten die Benachrichtigungen deines 
   | DeepL | API-Schlüssel von deepl.com („DeepL API Free“ ist kostenlos) |
   | LibreTranslate | Adresse deines eigenen Servers, ggf. Schlüssel |
   | Lokale KI – Ollama | [Ollama](https://ollama.com) auf deinem PC + Modellname (z. B. `llama3.1`) – nichts verlässt den Rechner |
-  | KI-API – OpenAI-kompatibel | Adresse, Schlüssel, Modell – OpenAI, OpenRouter, Groq, Mistral … oder lokal LM Studio (`http://localhost:1234/v1`, ohne Schlüssel) |
+  | **Lokale KI – LM Studio** | [LM Studio](https://lmstudio.ai) auf deinem PC: links „Developer“ → Modell laden → „Start Server“. Adresse und Modell können leer bleiben (Standard `http://127.0.0.1:1234/v1`, nimmt das geladene Modell) |
+  | KI-API – OpenAI-kompatibel | Adresse, Schlüssel, Modell – OpenAI, OpenRouter, Groq, Mistral … |
   | KI-API – Claude (Anthropic) | API-Schlüssel aus der Claude Console + Modellname |
 
   Außer bei Ollama/LM Studio auf deinem PC geht die Nachricht zum Übersetzen an den gewählten Dienst.
