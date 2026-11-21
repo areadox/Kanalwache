@@ -139,7 +139,7 @@
             <button type="button" class="btn small" id="btn-quick">Bearbeiten …</button></div>
           <label class="st-row"><span class="st-text"><span class="st-title">Eingabe übersetzen</span><span class="st-desc">Was du auf Deutsch schreibst, geht übersetzt in den Chat, wenn der Kanal eine andere Sprache hat. Pro Kanal schaltbar über „DE→EN“ in der Schnellleiste. Befehle (!…, /…) bleiben unverändert.</span></span><input type="checkbox" class="switch" data-setting="translateChat"></label>
           <label class="st-row"><span class="st-text"><span class="st-title">Chat übersetzen</span><span class="st-desc">Fremdsprachige Nachrichten der anderen bekommen klein darunter eine deutsche Übersetzung – nur im gerade sichtbaren Stream, höchstens 20 pro Minute (schont das Kontingent des Dienstes). Pro Kanal schaltbar über „EN→DE“.</span></span><input type="checkbox" class="switch" data-setting="translateIncoming"></label>
-          <label class="st-row"><span class="st-text"><span class="st-title">Übersetzen in</span><span class="st-desc">„Sprache des Kanals“ nimmt, was der Streamer bei Twitch eingestellt hat.</span></span>
+          <label class="st-row"><span class="st-text"><span class="st-title">Eingabe übersetzen in</span><span class="st-desc">„Sprache des Kanals“ nimmt, was der Streamer bei Twitch eingestellt hat. Der Chat wird immer ins Deutsche übersetzt.</span></span>
             <select data-setting="translateTo">
               <option value="auto">Sprache des Kanals</option>
               <option value="en">Englisch</option>
@@ -155,12 +155,12 @@
             </select></label>
           <label class="st-row"><span class="st-text"><span class="st-title">Übersetzungsdienst</span><span class="st-desc" id="tr-desc"></span></span>
             <select data-setting="translateService" id="tr-service">
-              <option value="mymemory">MyMemory (kostenlos, ohne Anmeldung)</option>
-              <option value="deepl">DeepL (API-Schlüssel)</option>
-              <option value="libre">LibreTranslate (eigener Server)</option>
-              <option value="ollama">Lokale KI – Ollama</option>
-              <option value="openai">KI-API – OpenAI-kompatibel</option>
-              <option value="anthropic">KI-API – Claude (Anthropic)</option>
+              <option value="mymemory">MyMemory (kostenlos)</option>
+              <option value="deepl">DeepL</option>
+              <option value="libre">LibreTranslate</option>
+              <option value="ollama">Lokale KI (Ollama)</option>
+              <option value="openai">KI-API (OpenAI-kompatibel)</option>
+              <option value="anthropic">KI-API (Claude)</option>
             </select></label>
           <label class="st-row tr-opt" data-for="libre ollama openai"><span class="st-text"><span class="st-title">Adresse</span><span class="st-desc" id="tr-url-desc"></span></span>
             <input type="text" class="st-input" data-setting="translateUrl" id="tr-url" autocomplete="off" spellcheck="false"></label>
