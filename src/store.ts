@@ -56,6 +56,8 @@ export interface Settings {
   showStreaks: boolean;
   /** Chat-Übersetzer: eigene deutsche Nachrichten in die Sprache des Kanals übersetzen */
   translateChat: boolean;
+  /** Chat übersetzen: fremdsprachige Nachrichten anderer mit deutscher Übersetzung darunter */
+  translateIncoming: boolean;
   /** Zielsprache: „auto“ = Sprache des Kanals laut Twitch, sonst fester Code (z. B. „en“) */
   translateTo: string;
   /** Optional: eigener DeepL-API-Schlüssel */
@@ -141,6 +143,7 @@ export const DEFAULT_SETTINGS: Settings = {
   dropsNotify: true,
   showStreaks: true,
   translateChat: true,
+  translateIncoming: false,
   translateTo: 'auto',
   deeplKey: '',
   translateService: 'mymemory',

@@ -46,6 +46,7 @@ interface AppSettings {
   dropsNotify: boolean;
   showStreaks: boolean;
   translateChat: boolean;
+  translateIncoming: boolean;
   translateTo: string;
   deeplKey: string;
   translateService: string;
@@ -192,7 +193,7 @@ interface KanalwacheApi {
   openExternal(url: string): Promise<void>;
   notifsRefresh(): Promise<void>;
   relation(login: string): Promise<ChannelRelation | null>;
-  translate(text: string, from: string, to: string): Promise<{ ok: boolean; text?: string; service?: string; error?: string }>;
+  translate(text: string, from: string, to: string, detect?: boolean): Promise<{ ok: boolean; text?: string; service?: string; error?: string }>;
   channelLanguage(login: string): Promise<string | null>;
   setFollow(id: string, follow: boolean): Promise<{ ok: boolean; fallback?: boolean; error?: string }>;
   dropsNotify(title: string, body: string): Promise<void>;

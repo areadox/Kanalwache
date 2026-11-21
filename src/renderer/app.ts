@@ -142,6 +142,7 @@ interface Tab {
   cbar: HTMLElement | null;
   /** Übersetzer-Knopf in der Schnellleiste */
   trBtn?: HTMLElement | null;
+  trInBtn?: HTMLElement | null;
   /** Kanalpunkte-Bonus liegt bereit (nur ohne automatisches Abholen) */
   bonusReady: boolean;
 }
@@ -455,6 +456,7 @@ const NAV_VIEWS = ['home', 'giveaways'];
 function activate(id: string): void {
   activeId = tabs.has(id) || FIXED_VIEWS.includes(id) ? id : 'home';
   if (activeId === 'twitch') ensureTwitchHome();
+  for (const x of tabs.values()) syncIncoming(x);
   // Ton folgt dem aktiven Stream; auf Übersicht/Giveaways läuft der bisherige weiter
   if (singleAudio() && tabs.get(activeId)?.kind === 'stream' && audioTabId !== activeId) setAudioTab(activeId, isRememberedMuted(activeId));
   for (const v of FIXED_VIEWS) document.getElementById(`view-${v}`)!.classList.toggle('active', activeId === v);
@@ -1030,19 +1032,144 @@ function attachChatHistory(t: Tab, wv: WebviewEl): void {
   });
   wv.addEventListener('console-message', (e: Event) => {
     const msg = String((e as unknown as { message?: string }).message ?? '');
-    const m = msg.match(/^__kw:(sent|resend|clear|translate):(.*)$/s);
+    const m = msg.match(/^__kw:(sent|resend|clear|translate|intr):(.*)$/s);
     if (!m) return;
     let text = '';
+    if (m[1] === 'intr') {
+      try { const o = JSON.parse(m[2]) as { id: string; text: string }; queueIncoming(t, o.id, o.text); } catch { /* egal */ }
+      return;
+    }
     try { text = JSON.parse(m[2]); } catch { return; }
     if (m[1] === 'clear') { chatHistory = []; saveChatHistory(); toast('Chat-Verlauf geleert.'); return; }
     if (m[1] === 'sent') { rememberChat(text); return; }
     if (m[1] === 'translate') { void translateAndSend(t, text, true); return; }
     void resendChat(t, text);
   });
-  wv.addEventListener('dom-ready', () => setTimeout(() => syncTranslator(t, true), 300));
+  wv.addEventListener('dom-ready', () => setTimeout(() => {
+    if (!/\/popout\/[^/]+\/chat/.test(wv.getURL())) return;
+    void wv.executeJavaScript(`(${chatIncomingUi.toString()})(${JSON.stringify((state?.auth.user ?? '').toLowerCase())})`).catch(() => {});
+    syncTranslator(t, true);
+    syncIncoming(t, true);
+  }, 300));
 }
 
 // ---------- Chat-Übersetzer ----------
+
+/**
+ * Läuft im Popout-Chat: beobachtet neue Chatzeilen und meldet ihren Text, solange „Chat übersetzen“ an ist;
+ * die Übersetzung kommt über __kwTrShow zurück und steht klein unter der Nachricht.
+ * Wird per toString() in die Seite geschickt.
+ */
+function chatIncomingUi(own: string): void {
+  const w = window as any;
+  if (w.__kwInSet) return;
+  let on = false;
+  let seq = 0;
+  const log = () => document.querySelector('[data-test-selector="chat-scrollable-area__message-container"], .chat-scrollable-area__message-container, [role="log"]');
+  const lineText = (line: Element): string => {
+    const parts = Array.from(line.querySelectorAll('[data-a-target="chat-message-text"], .mention-fragment, [data-a-target="chat-message-mention"]'));
+    let t = parts.length ? parts.map((p) => p.textContent || '').join(' ') : '';
+    if (!t) {
+      const body = line.querySelector('[data-a-target="chat-line-message-body"], .message');
+      t = body ? body.textContent || '' : '';
+    }
+    return t.replace(/\s+/g, ' ').trim();
+  };
+  const handle = (line: Element) => {
+    if (!on || (line as HTMLElement).dataset.kwTr) return;
+    (line as HTMLElement).dataset.kwTr = '1';
+    const user = (line.querySelector('[data-a-target="chat-message-username"]')?.textContent || '').trim().toLowerCase();
+    if (user && user === own) return;
+    const text = lineText(line);
+    // Nur echte Sätze: keine Befehle, keine reinen Emotes/Links/Zahlen, nicht zu kurz
+    if (text.length < 6 || /^[!/]/.test(text) || !/\p{L}{3}/u.test(text) || /^https?:\/\/\S+$/.test(text)) return;
+    const id = `kw${++seq}`;
+    (line as HTMLElement).dataset.kwTrId = id;
+    console.log('__kw:intr:' + JSON.stringify({ id, text }));
+  };
+  const obs = new MutationObserver((muts) => {
+    if (!on) return;
+    for (const m of muts) for (const n of Array.from(m.addedNodes)) {
+      if (!(n instanceof Element)) continue;
+      const line = n.matches('.chat-line__message, [data-a-target="chat-line-message"]') ? n : n.querySelector('.chat-line__message, [data-a-target="chat-line-message"]');
+      if (line) handle(line);
+    }
+  });
+  const attach = () => { const l = log(); if (l) obs.observe(l, { childList: true, subtree: true }); else setTimeout(attach, 1000); };
+  attach();
+  w.__kwInSet = (v: boolean) => { on = v; };
+  w.__kwTrShow = (id: string, text: string, service: string) => {
+    const line = document.querySelector(`[data-kw-tr-id="${id}"]`);
+    if (!line || line.querySelector('.kw-intr')) return;
+    const box = document.createElement('div');
+    box.className = 'kw-intr';
+    box.textContent = '🌐 ' + text;
+    box.title = 'Übersetzt mit ' + service;
+    Object.assign(box.style, { fontSize: '12px', lineHeight: '1.35', color: '#a7a7b8', fontStyle: 'italic', padding: '1px 0 3px 0', overflowWrap: 'anywhere' });
+    line.appendChild(box);
+  };
+}
+
+/** Warteschlange für eingehende Übersetzungen – nur im sichtbaren Tab, gedrosselt (Kontingent der Dienste) */
+const inQueue = new Map<string, { id: string; text: string }[]>();
+const inStamps: number[] = [];
+const IN_PER_MIN = 20;
+let inBusy = false;
+
+const inOff = new Set<string>((() => {
+  try { const v = JSON.parse(localStorage.getItem('kw.translateInOff') ?? '[]'); return Array.isArray(v) ? v : []; } catch { return []; }
+})());
+
+function inTrLang(t: Tab): string | null {
+  if (!state?.settings.translateIncoming || !t.login || inOff.has(t.login)) return null;
+  const l = channelLang(t.login);
+  return l && l !== 'de' ? l : null;
+}
+
+function syncIncoming(t: Tab, force = false): void {
+  if (!t.chat || !t.chatReady) return;
+  const on = !!inTrLang(t) && activeId === t.id;
+  const key = String(on);
+  if (!force && t.chat.dataset.intr === key) return;
+  t.chat.dataset.intr = key;
+  if (!on) inQueue.delete(t.id);
+  void t.chat.executeJavaScript(`window.__kwInSet && window.__kwInSet(${on})`).catch(() => {});
+}
+
+function queueIncoming(t: Tab, id: string, text: string): void {
+  if (!inTrLang(t) || activeId !== t.id) return;
+  const q = inQueue.get(t.id) ?? [];
+  q.push({ id, text });
+  // Bei schnellem Chat nur die neuesten behalten
+  while (q.length > 8) q.shift();
+  inQueue.set(t.id, q);
+  void pumpIncoming();
+}
+
+async function pumpIncoming(): Promise<void> {
+  if (inBusy) return;
+  inBusy = true;
+  try {
+    for (;;) {
+      const t = tabs.get(activeId);
+      const q = t ? inQueue.get(t.id) : undefined;
+      if (!t || !q?.length) break;
+      const now = Date.now();
+      while (inStamps.length && now - inStamps[0] > 60_000) inStamps.shift();
+      if (inStamps.length >= IN_PER_MIN) { setTimeout(() => void pumpIncoming(), 60_000 - (now - inStamps[0]) + 50); break; }
+      const item = q.shift()!;
+      const lang = inTrLang(t);
+      if (!lang) break;
+      inStamps.push(now);
+      const r = await api.translate(item.text, lang, 'de', true);
+      if (r.ok && r.text && r.text.trim().toLowerCase() !== item.text.trim().toLowerCase()) {
+        void t.chat?.executeJavaScript(`window.__kwTrShow && window.__kwTrShow(${JSON.stringify(item.id)}, ${JSON.stringify(r.text)}, ${JSON.stringify(r.service ?? '')})`).catch(() => {});
+      }
+    }
+  } finally {
+    inBusy = false;
+  }
+}
 
 /** Kanäle, bei denen du den Übersetzer ausgeschaltet hast */
 const trOff = new Set<string>((() => {
@@ -1096,7 +1223,24 @@ async function translateAndSend(t: Tab, text: string, fromInput: boolean): Promi
 }
 
 function trButton(t: Tab): HTMLElement | null {
-  if (!t.login || !state?.settings.translateChat) return null;
+  if (!t.login || (!state?.settings.translateChat && !state?.settings.translateIncoming)) return null;
+  const wrap = h('span', { class: 'qb-tr-wrap' });
+  const inBtn = h('button', { type: 'button', class: 'qb-tr qb-tr-in', onclick: () => {
+    if (!t.login) return;
+    if (inOff.has(t.login)) inOff.delete(t.login); else inOff.add(t.login);
+    try { localStorage.setItem('kw.translateInOff', JSON.stringify([...inOff])); } catch { /* egal */ }
+    updateTrButton(t);
+    syncIncoming(t);
+    toast(inOff.has(t.login) ? 'Chat-Übersetzung für diesen Kanal aus.' : 'Chat wird übersetzt – die Übersetzung steht klein unter den Nachrichten.');
+  } });
+  t.trInBtn = inBtn;
+  const outBtn = trOutButton(t);
+  wrap.append(outBtn, inBtn);
+  updateTrButton(t);
+  return wrap;
+}
+
+function trOutButton(t: Tab): HTMLElement {
   const btn = h('button', { type: 'button', class: 'qb-tr', 'data-tab': t.id, onclick: () => {
     if (!t.login) return;
     if (trOff.has(t.login)) trOff.delete(t.login); else trOff.add(t.login);
@@ -1106,7 +1250,6 @@ function trButton(t: Tab): HTMLElement | null {
     toast(trOff.has(t.login) ? 'Übersetzer für diesen Kanal aus.' : 'Übersetzer für diesen Kanal an.');
   } });
   t.trBtn = btn;
-  updateTrButton(t);
   return btn;
 }
 
@@ -1114,6 +1257,16 @@ function updateTrButton(t: Tab): void {
   const btn = t.trBtn;
   if (!btn || !t.login) return;
   const lang = channelLang(t.login);
+  const inBtn = t.trInBtn;
+  if (inBtn) {
+    const usefulIn = !!state?.settings.translateIncoming && !!lang && lang !== 'de';
+    const offIn = inOff.has(t.login);
+    inBtn.hidden = !usefulIn;
+    inBtn.classList.toggle('is-on', usefulIn && !offIn);
+    inBtn.title = usefulIn ? (offIn ? `Chat-Übersetzung aus – klicken, um Nachrichten aus dem ${lang!.toUpperCase()} ins Deutsche zu übersetzen` : 'Chat wird ins Deutsche übersetzt – klicken zum Ausschalten') : '';
+    inBtn.replaceChildren(icon('chat'), h('span', { text: usefulIn ? `${lang!.toUpperCase()}→DE` : '' }));
+  }
+  if (!state?.settings.translateChat) { btn.hidden = true; return; }
   const off = trOff.has(t.login);
   const useful = !!lang && lang !== 'de';
   btn.hidden = !useful;
@@ -1343,6 +1496,7 @@ function updateQuickbars(): void {
     updateMuteButton(t);
     updateTrButton(t);
     syncTranslator(t);
+    syncIncoming(t);
     const key = JSON.stringify([state?.quickMessages ?? [], !!state?.auth.loggedIn]);
     const focusInMsgs = !!t.qbar.querySelector('.qb-msgs')?.contains(document.activeElement);
     if (t.qbar.dataset.key !== key && !focusInMsgs) fillQuickbar(t, t.qbar);

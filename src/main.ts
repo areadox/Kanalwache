@@ -988,7 +988,7 @@ function registerIpc(): void {
     if (!patch || typeof patch !== 'object') return;
     const p = patch as Partial<Settings>;
     const s = store.config.settings;
-    for (const key of ['closeToTray', 'startInTray', 'autostart', 'muteAutoOpened', 'closeTabWhenOffline', 'giveawayHelper', 'giveawayNotify', 'autoClaimPoints', 'syncFollows', 'followNotify', 'followAutoOpen', 'fullPage', 'singleAudio', 'showFavBar', 'raidPrompt', 'autoUpdate', 'twitchNotifs', 'twitchNotifPopup', 'dropsCheck', 'autoClaimDrops', 'dropsNotify', 'showStreaks', 'translateChat'] as const) {
+    for (const key of ['closeToTray', 'startInTray', 'autostart', 'muteAutoOpened', 'closeTabWhenOffline', 'giveawayHelper', 'giveawayNotify', 'autoClaimPoints', 'syncFollows', 'followNotify', 'followAutoOpen', 'fullPage', 'singleAudio', 'showFavBar', 'raidPrompt', 'autoUpdate', 'twitchNotifs', 'twitchNotifPopup', 'dropsCheck', 'autoClaimDrops', 'dropsNotify', 'showStreaks', 'translateChat', 'translateIncoming'] as const) {
       if (typeof p[key] === 'boolean') s[key] = p[key] as boolean;
     }
     if (typeof p.pollSeconds === 'number') s.pollSeconds = clampPoll(p.pollSeconds);
@@ -1149,7 +1149,7 @@ function registerIpc(): void {
     n.show();
   });
 
-  ipcMain.handle('translate', async (_e, text: unknown, from: unknown, to: unknown) => {
+  ipcMain.handle('translate', async (_e, text: unknown, from: unknown, to: unknown, detect: unknown) => {
     if (typeof text !== 'string' || typeof from !== 'string' || typeof to !== 'string' || !/^[a-z]{2}$/.test(from) || !/^[a-z]{2}$/.test(to)) return { ok: false, error: 'Ungültig.' };
     const s = store.config.settings;
     const service = s.translateService as TranslateService;
@@ -1158,7 +1158,7 @@ function registerIpc(): void {
       key: service === 'deepl' ? s.translateKey || s.deeplKey : s.translateKey,
       url: s.translateUrl,
       model: s.translateModel,
-    });
+    }, detect === true);
   });
   ipcMain.handle('channel-language', async (_e, login: unknown) => {
     if (typeof login !== 'string' || !/^[a-z0-9_]{2,25}$/.test(login) || !authToken) return null;

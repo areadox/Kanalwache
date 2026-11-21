@@ -20,7 +20,12 @@ const LANG_NAMES: Record<string, string> = {
   fi: 'Finnish', no: 'Norwegian', cs: 'Czech', hu: 'Hungarian', uk: 'Ukrainian', ar: 'Arabic', de: 'German',
 };
 
-function prompt(text: string, from: string, to: string): string {
+function prompt(text: string, from: string, to: string, detect = false): string {
+  if (detect) {
+    return `Translate this Twitch chat message into ${LANG_NAMES[to] ?? to}. If it is already in ${LANG_NAMES[to] ?? to}, answer with it unchanged. `
+      + 'Keep @mentions, usernames, emote names and emojis unchanged, keep the casual chat tone, and answer with the translation only – no quotes, no explanations.\n\n'
+      + text;
+  }
   return `Translate this Twitch chat message from ${LANG_NAMES[from] ?? from} to ${LANG_NAMES[to] ?? to}. `
     + 'Keep @mentions, usernames, emote names and emojis unchanged, keep the casual chat tone, and answer with the translation only – no quotes, no explanations.\n\n'
     + text;
@@ -49,7 +54,7 @@ async function json(res: Response, name: string): Promise<any> {
   return res.json();
 }
 
-export async function translateText(text: string, from: string, to: string, opt: TranslateOptions): Promise<Result> {
+export async function translateText(text: string, from: string, to: string, opt: TranslateOptions, detect = false): Promise<Result> {
   const src = from.toLowerCase();
   const dst = to.toLowerCase();
   if (!text.trim()) return { ok: false, error: 'Leere Nachricht.' };
@@ -61,7 +66,7 @@ export async function translateText(text: string, from: string, to: string, opt:
         const j = await json(await net.fetch(`https://${host}/v2/translate`, {
           method: 'POST',
           headers: { Authorization: `DeepL-Auth-Key ${opt.key.trim()}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: [text], source_lang: src.toUpperCase(), target_lang: dst === 'en' ? 'EN-US' : dst === 'pt' ? 'PT-BR' : dst.toUpperCase() }),
+          body: JSON.stringify({ text: [text], ...(detect ? {} : { source_lang: src.toUpperCase() }), target_lang: dst === 'en' ? 'EN-US' : dst === 'pt' ? 'PT-BR' : dst.toUpperCase() }),
         }), 'DeepL');
         const out = j?.translations?.[0]?.text;
         return typeof out === 'string' && out ? { ok: true, text: out, service: 'DeepL' } : { ok: false, error: 'DeepL hat nichts zurückgegeben.' };
@@ -70,7 +75,7 @@ export async function translateText(text: string, from: string, to: string, opt:
         const j = await json(await net.fetch(`${base(opt.url, 'http://localhost:5000')}/translate`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ q: text, source: src, target: dst, format: 'text', ...(opt.key.trim() ? { api_key: opt.key.trim() } : {}) }),
+          body: JSON.stringify({ q: text, source: detect ? 'auto' : src, target: dst, format: 'text', ...(opt.key.trim() ? { api_key: opt.key.trim() } : {}) }),
         }), 'LibreTranslate');
         const out = j?.translatedText;
         return typeof out === 'string' && out ? { ok: true, text: out, service: 'LibreTranslate' } : { ok: false, error: j?.error || 'LibreTranslate hat nichts zurückgegeben.' };
@@ -80,7 +85,7 @@ export async function translateText(text: string, from: string, to: string, opt:
         const j = await json(await net.fetch(`${base(opt.url, 'http://localhost:11434')}/api/chat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model: opt.model.trim(), stream: false, options: { temperature: 0.2 }, messages: [{ role: 'user', content: prompt(text, src, dst) }] }),
+          body: JSON.stringify({ model: opt.model.trim(), stream: false, options: { temperature: 0.2 }, messages: [{ role: 'user', content: prompt(text, src, dst, detect) }] }),
         }), 'Ollama');
         const out = j?.message?.content;
         return typeof out === 'string' && out.trim() ? { ok: true, text: clean(out), service: `Ollama (${opt.model.trim()})` } : { ok: false, error: 'Ollama hat nichts zurückgegeben.' };
@@ -92,7 +97,7 @@ export async function translateText(text: string, from: string, to: string, opt:
         const j = await json(await net.fetch(`${base(opt.url, 'https://api.openai.com/v1')}/chat/completions`, {
           method: 'POST',
           headers,
-          body: JSON.stringify({ model: opt.model.trim(), temperature: 0.2, messages: [{ role: 'user', content: prompt(text, src, dst) }] }),
+          body: JSON.stringify({ model: opt.model.trim(), temperature: 0.2, messages: [{ role: 'user', content: prompt(text, src, dst, detect) }] }),
         }), 'KI-Dienst');
         const out = j?.choices?.[0]?.message?.content;
         return typeof out === 'string' && out.trim() ? { ok: true, text: clean(out), service: opt.model.trim() } : { ok: false, error: 'Der KI-Dienst hat nichts zurückgegeben.' };
@@ -103,7 +108,7 @@ export async function translateText(text: string, from: string, to: string, opt:
         const j = await json(await net.fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: { 'x-api-key': opt.key.trim(), 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model: opt.model.trim(), max_tokens: 400, messages: [{ role: 'user', content: prompt(text, src, dst) }] }),
+          body: JSON.stringify({ model: opt.model.trim(), max_tokens: 400, messages: [{ role: 'user', content: prompt(text, src, dst, detect) }] }),
         }), 'Claude');
         const out = Array.isArray(j?.content) ? j.content.filter((c: any) => c?.type === 'text').map((c: any) => c.text).join('') : '';
         return out.trim() ? { ok: true, text: clean(out), service: opt.model.trim() } : { ok: false, error: 'Claude hat nichts zurückgegeben.' };
