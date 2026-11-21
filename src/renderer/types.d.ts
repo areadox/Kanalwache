@@ -45,6 +45,9 @@ interface AppSettings {
   autoClaimDrops: boolean;
   dropsNotify: boolean;
   showStreaks: boolean;
+  translateChat: boolean;
+  translateTo: string;
+  deeplKey: string;
 }
 
 interface QuickMessage {
@@ -124,6 +127,7 @@ interface AppState {
   broadcaster: string | null;
   update: { state: UpdateState; version: string; portable: boolean; supported: boolean };
   streaks: Record<string, number>;
+  languages: Record<string, string>;
   notifs: { list: TwitchNotification[]; error: string | null; loading: boolean; at: number | null; unread: number; seenAt: number };
 }
 
@@ -184,6 +188,8 @@ interface KanalwacheApi {
   openExternal(url: string): Promise<void>;
   notifsRefresh(): Promise<void>;
   relation(login: string): Promise<ChannelRelation | null>;
+  translate(text: string, from: string, to: string): Promise<{ ok: boolean; text?: string; service?: string; error?: string }>;
+  channelLanguage(login: string): Promise<string | null>;
   setFollow(id: string, follow: boolean): Promise<{ ok: boolean; fallback?: boolean; error?: string }>;
   dropsNotify(title: string, body: string): Promise<void>;
   notifsSeen(): Promise<void>;

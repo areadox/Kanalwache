@@ -16,6 +16,8 @@ contextBridge.exposeInMainWorld('kanalwache', {
   openExternal: (url: string) => ipcRenderer.invoke('open-external', url),
   notifsRefresh: () => ipcRenderer.invoke('notifs-refresh'),
   relation: (login: string) => ipcRenderer.invoke('relation', login),
+  translate: (text: string, from: string, to: string) => ipcRenderer.invoke('translate', text, from, to),
+  channelLanguage: (login: string) => ipcRenderer.invoke('channel-language', login),
   setFollow: (id: string, follow: boolean) => ipcRenderer.invoke('set-follow', id, follow),
   dropsNotify: (title: string, body: string) => ipcRenderer.invoke('drops-notify', title, body),
   notifsSeen: () => ipcRenderer.invoke('notifs-seen'),

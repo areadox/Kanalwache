@@ -7,7 +7,8 @@ import { clampPoll, normalizeLogin, sanitizeQuickMessages, Settings, Store } fro
 import { ChannelStatus, fetchFollows, fetchModChannels, fetchStatuses, FollowedChannel } from './twitch';
 import { fetchTwitchNotifications, TwitchNotification } from './notifications';
 import { fetchRelation, setFollow } from './relation';
-import { fetchStreaks } from './streaks';
+import { fetchLanguages, fetchStreaks } from './streaks';
+import { translateText } from './translate';
 import { TwitchChat } from './chat';
 import { analyzeAnnouncement, ENTRY_RE, Giveaway, GiveawayDetector } from './giveaway';
 import { compileRules, CompiledRules, DEFAULT_RULES, sanitizeRules } from './rules';
@@ -195,6 +196,8 @@ function openNotif(n: TwitchNotification): void {
 // ---------- Zuschauerserien ----------
 
 const streaks = new Map<string, number>();
+/** Sprache der Kanäle laut Twitch – für den Chat-Übersetzer */
+const languages = new Map<string, string>();
 let streakTimer: NodeJS.Timeout | null = null;
 let streakRunning = false;
 
@@ -209,6 +212,9 @@ async function refreshStreaks(): Promise<void> {
   try {
     const own = store.config.own?.login;
     const logins = store.allLogins().filter((l) => l !== own);
+    try {
+      for (const [l, lang] of await fetchLanguages(authToken, logins)) languages.set(l, lang);
+    } catch { /* Sprache bleibt unbekannt */ }
     const res = await fetchStreaks(authToken, logins);
     for (const [login, s] of res) {
       if (s && s.count >= 1) streaks.set(login, s.count);
@@ -864,6 +870,7 @@ function buildState() {
     chat: { connected: chat.connected, canSend: chat.canSend, authProblem: chat.authProblem },
     notifs: { ...notifs, unread: notifUnread(), seenAt: store.config.notifSeenAt },
     streaks: Object.fromEntries(streaks),
+    languages: Object.fromEntries(languages),
   };
 }
 
@@ -981,11 +988,13 @@ function registerIpc(): void {
     if (!patch || typeof patch !== 'object') return;
     const p = patch as Partial<Settings>;
     const s = store.config.settings;
-    for (const key of ['closeToTray', 'startInTray', 'autostart', 'muteAutoOpened', 'closeTabWhenOffline', 'giveawayHelper', 'giveawayNotify', 'autoClaimPoints', 'syncFollows', 'followNotify', 'followAutoOpen', 'fullPage', 'singleAudio', 'showFavBar', 'raidPrompt', 'autoUpdate', 'twitchNotifs', 'twitchNotifPopup', 'dropsCheck', 'autoClaimDrops', 'dropsNotify', 'showStreaks'] as const) {
+    for (const key of ['closeToTray', 'startInTray', 'autostart', 'muteAutoOpened', 'closeTabWhenOffline', 'giveawayHelper', 'giveawayNotify', 'autoClaimPoints', 'syncFollows', 'followNotify', 'followAutoOpen', 'fullPage', 'singleAudio', 'showFavBar', 'raidPrompt', 'autoUpdate', 'twitchNotifs', 'twitchNotifPopup', 'dropsCheck', 'autoClaimDrops', 'dropsNotify', 'showStreaks', 'translateChat'] as const) {
       if (typeof p[key] === 'boolean') s[key] = p[key] as boolean;
     }
     if (typeof p.pollSeconds === 'number') s.pollSeconds = clampPoll(p.pollSeconds);
     if (p.recordQuality === 'high' || p.recordQuality === 'medium' || p.recordQuality === 'low') s.recordQuality = p.recordQuality;
+    if (typeof p.deeplKey === 'string') s.deeplKey = p.deeplKey.trim().slice(0, 100);
+    if (typeof p.translateTo === 'string' && /^(auto|[a-z]{2})$/.test(p.translateTo)) s.translateTo = p.translateTo;
     applyAutostart();
     if (p.syncFollows === true) void syncFollows();
     if (typeof p.autoUpdate === 'boolean') updater.setAuto(p.autoUpdate);
@@ -1134,6 +1143,21 @@ function registerIpc(): void {
       win?.webContents.send('shortcut', 'drops');
     });
     n.show();
+  });
+
+  ipcMain.handle('translate', async (_e, text: unknown, from: unknown, to: unknown) => {
+    if (typeof text !== 'string' || typeof from !== 'string' || typeof to !== 'string' || !/^[a-z]{2}$/.test(from) || !/^[a-z]{2}$/.test(to)) return { ok: false, error: 'Ungültig.' };
+    return translateText(text.slice(0, 500), from, to, store.config.settings.deeplKey ?? '');
+  });
+  ipcMain.handle('channel-language', async (_e, login: unknown) => {
+    if (typeof login !== 'string' || !/^[a-z0-9_]{2,25}$/.test(login) || !authToken) return null;
+    if (languages.has(login)) return languages.get(login);
+    try {
+      const m = await fetchLanguages(authToken, [login]);
+      const l = m.get(login);
+      if (l) { languages.set(login, l); pushState(); }
+      return l ?? null;
+    } catch { return null; }
   });
 
   ipcMain.handle('relation', async (_e, login: unknown) => {

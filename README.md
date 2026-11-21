@@ -112,6 +112,15 @@ Nach der Anmeldung holt Kanalwache alle 2 Minuten die Benachrichtigungen deines 
 - Einstellungen → *Twitch-Benachrichtigungen*: Abruf ein/aus und, wenn du willst, neue zusätzlich als **Windows-Meldung** (standardmäßig aus, weil Kanalwache bei Live-Gängen schon selbst meldet).
 - Twitch dokumentiert diese Schnittstelle nicht. Ändert Twitch etwas daran, steht in der Liste ein Hinweis – über **Auf twitch.tv** siehst du die Benachrichtigungen dann im Browser.
 
+## Chat-Übersetzer
+
+Schreibst du auf Deutsch in einem Kanal, dessen Sprache bei Twitch nicht Deutsch ist (z. B. Englisch), übersetzt Kanalwache deine Nachricht beim Senden und schreibt die Übersetzung in den Chat. Darunter erscheint kurz „Übersetzt (EN): …“.
+
+- **DE→EN** in der Schnellleiste zeigt, dass der Übersetzer in diesem Kanal aktiv ist; ein Klick schaltet ihn für den Kanal aus (durchgestrichen) und wieder an. Bei deutschsprachigen Kanälen ist der Knopf ausgeblendet.
+- Befehle (`!join`, `/me` …) werden nie übersetzt. Nachrichten aus dem Chat-Verlauf (↑) werden beim erneuten Senden ebenfalls übersetzt.
+- Klappt die Übersetzung nicht, steht deine Nachricht wieder im Eingabefeld – nichts geht unübersetzt raus.
+- Einstellungen → *Chat & Schnellleiste*: Übersetzer an/aus, Zielsprache („Sprache des Kanals“ oder fest, z. B. Englisch) und optional ein **DeepL-API-Schlüssel**. Ohne Schlüssel übersetzt der kostenlose Dienst MyMemory (begrenzt auf einige tausend Zeichen am Tag); mit einem kostenlosen „DeepL API Free“-Schlüssel ist die Übersetzung besser. Die Nachricht geht dazu an den jeweiligen Dienst.
+
 ## Chat-Verlauf
 
 Was du im Chat schreibst, merkt sich Kanalwache (die letzten 50 Nachrichten, über alle Kanäle). So schreibst du etwas nochmal, ohne es neu zu tippen:

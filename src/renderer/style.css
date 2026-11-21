@@ -1083,3 +1083,15 @@ input.switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2
 .tw-hint { flex: 1; margin-left: 8px; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tw-bar .icon-btn:disabled { opacity: .35; }
 .qb-follow.is-on { width: 30px; padding: 0; justify-content: center; }
+
+/* Chat-Übersetzer */
+.qb-tr {
+  display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 10px; border-radius: 6px; flex: none;
+  border: 1px solid var(--line); background: #26262c; color: var(--muted); font: inherit; font-size: 12.5px; cursor: pointer; white-space: nowrap;
+}
+.qb-tr[hidden] { display: none; }
+.qb-tr .ico { width: 15px; height: 15px; }
+.qb-tr.is-on { color: #fff; border-color: rgba(80, 180, 255, .6); background: rgba(40, 120, 200, .35); }
+.qb-tr:not(.is-on) span { text-decoration: line-through; }
+.st-input { flex: none; width: 240px; height: 32px; padding: 0 10px; border-radius: 7px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit; font-size: 13px; }
+.st-input:focus { outline: none; border-color: var(--accent); }

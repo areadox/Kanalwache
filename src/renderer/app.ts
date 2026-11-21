@@ -49,6 +49,7 @@ const ICONS = {
   star: '<svg viewBox="0 0 24 24"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9L12 3.5Z"/></svg>',
   sword: '<svg viewBox="0 0 24 24"><path d="M14.5 17.5 3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2"/></svg>',
   compass: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5 5-2Z"/></svg>',
+  globe: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9s1.3-6.4 3.8-9Z"/></svg>',
   plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
   flame: '<svg viewBox="0 0 24 24"><path d="M12 21c-4 0-7-2.8-7-6.6 0-3.1 2-5.2 3.6-6.9.4 1.8 1.4 3 2.6 3.5C11 7.6 12.4 5 15 3c-.2 2.7.7 4.4 2 6 1.2 1.5 2 3.1 2 5.2 0 3.9-3 6.8-7 6.8Z"/></svg>',
   heart: '<svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10Z"/></svg>',
@@ -139,6 +140,8 @@ interface Tab {
   qbar: HTMLElement | null;
   /** Leiste über der Schnellleiste: „Bonus abholen“ / „Drop abholen“, nur wenn es etwas gibt */
   cbar: HTMLElement | null;
+  /** Übersetzer-Knopf in der Schnellleiste */
+  trBtn?: HTMLElement | null;
   /** Kanalpunkte-Bonus liegt bereit (nur ohne automatisches Abholen) */
   bonusReady: boolean;
 }
@@ -949,17 +952,47 @@ function chatHistoryUi(initial: string[]): void {
     }
     if (!inInput || !el) return;
     if (e.key === 'ArrowUp' && !inputText(el) && hist.length) { e.preventDefault(); e.stopPropagation(); show(); return; }
-    // Gesendete Nachricht merken (Enter ohne Umschalt)
+    // Gesendete Nachricht merken (Enter ohne Umschalt) – oder erst übersetzen lassen
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
       const text = inputText(el);
+      if (text && w.__kwTr && !/^[!/]/.test(text)) {
+        e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+        clearInput();
+        send('translate', text);
+        return;
+      }
       if (text) send('sent', text);
     }
   }, true);
   document.addEventListener('click', (e) => {
     const b = (e.target as HTMLElement).closest?.('[data-a-target="chat-send-button"]');
     const el = input();
-    if (b && el) { const text = inputText(el); if (text) send('sent', text); }
+    if (b && el) {
+      const text = inputText(el);
+      if (text && w.__kwTr && !/^[!/]/.test(text)) {
+        e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+        clearInput();
+        send('translate', text);
+        return;
+      }
+      if (text) send('sent', text);
+    }
   }, true);
+  function clearInput() {
+    const el = input();
+    if (!el) return;
+    el.focus();
+    document.execCommand('selectAll', false);
+    document.execCommand('delete', false);
+    if ((el as HTMLTextAreaElement).value) {
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+      setter?.call(el, '');
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  }
+  w.__kwInsert = (text: string) => insert(text);
+  /** Übersetzer an/aus: Zielsprache oder null */
+  w.__kwTrSet = (lang: string | null) => { w.__kwTr = lang; };
 
   w.__kwHistSet = (list: string[]) => { hist = list; if (open) { if (!hist.length) close(); else { sel = Math.min(sel, hist.length - 1); render(); } } place(); };
   setInterval(place, 700);
@@ -997,19 +1030,104 @@ function attachChatHistory(t: Tab, wv: WebviewEl): void {
   });
   wv.addEventListener('console-message', (e: Event) => {
     const msg = String((e as unknown as { message?: string }).message ?? '');
-    const m = msg.match(/^__kw:(sent|resend|clear):(.*)$/s);
+    const m = msg.match(/^__kw:(sent|resend|clear|translate):(.*)$/s);
     if (!m) return;
     let text = '';
     try { text = JSON.parse(m[2]); } catch { return; }
     if (m[1] === 'clear') { chatHistory = []; saveChatHistory(); toast('Chat-Verlauf geleert.'); return; }
     if (m[1] === 'sent') { rememberChat(text); return; }
+    if (m[1] === 'translate') { void translateAndSend(t, text, true); return; }
     void resendChat(t, text);
   });
+  wv.addEventListener('dom-ready', () => setTimeout(() => syncTranslator(t, true), 300));
+}
+
+// ---------- Chat-Übersetzer ----------
+
+/** Kanäle, bei denen du den Übersetzer ausgeschaltet hast */
+const trOff = new Set<string>((() => {
+  try { const v = JSON.parse(localStorage.getItem('kw.translateOff') ?? '[]'); return Array.isArray(v) ? v : []; } catch { return []; }
+})());
+const langAsked = new Set<string>();
+
+/** Sprache des Kanals (laut Twitch oder fest eingestellt) – null, wenn nichts zu übersetzen ist */
+function channelLang(login: string | null | undefined): string | null {
+  if (!login || !state) return null;
+  if (state.settings.translateTo && state.settings.translateTo !== 'auto') return state.settings.translateTo;
+  const l = state.languages?.[login];
+  if (!l && !langAsked.has(login)) { langAsked.add(login); void api.channelLanguage(login); }
+  return l ?? null;
+}
+
+/** Zielsprache für diesen Tab, wenn der Übersetzer gerade aktiv ist */
+function trTarget(t: Tab): string | null {
+  if (!state?.settings.translateChat || !t.login || trOff.has(t.login)) return null;
+  const l = channelLang(t.login);
+  return l && l !== 'de' ? l : null;
+}
+
+function syncTranslator(t: Tab, force = false): void {
+  if (!t.chat || !t.chatReady) return;
+  const lang = trTarget(t);
+  const key = String(lang);
+  if (!force && t.chat.dataset.tr === key) return;
+  t.chat.dataset.tr = key;
+  void t.chat.executeJavaScript(`window.__kwTrSet && window.__kwTrSet(${JSON.stringify(lang)})`).catch(() => {});
+}
+
+async function translateAndSend(t: Tab, text: string, fromInput: boolean): Promise<boolean> {
+  const lang = trTarget(t);
+  if (!t.login || !lang) { const r = await api.chatSend(t.login!, text); if (r.ok) rememberChat(text); return r.ok; }
+  const tr = await api.translate(text, 'de', lang);
+  if (!tr.ok || !tr.text) {
+    toast(`${tr.error ?? 'Übersetzung ging nicht.'} Die Nachricht steht wieder im Eingabefeld.`);
+    if (fromInput) void t.chat?.executeJavaScript(`window.__kwInsert && window.__kwInsert(${JSON.stringify(text)})`).catch(() => {});
+    return false;
+  }
+  const r = await api.chatSend(t.login, tr.text);
+  if (r.ok) {
+    rememberChat(text);
+    toast(`Übersetzt (${lang.toUpperCase()}): ${tr.text}`);
+  } else {
+    toast(r.error ?? 'Senden ging nicht.');
+    if (fromInput) void t.chat?.executeJavaScript(`window.__kwInsert && window.__kwInsert(${JSON.stringify(text)})`).catch(() => {});
+  }
+  return r.ok;
+}
+
+function trButton(t: Tab): HTMLElement | null {
+  if (!t.login || !state?.settings.translateChat) return null;
+  const btn = h('button', { type: 'button', class: 'qb-tr', 'data-tab': t.id, onclick: () => {
+    if (!t.login) return;
+    if (trOff.has(t.login)) trOff.delete(t.login); else trOff.add(t.login);
+    try { localStorage.setItem('kw.translateOff', JSON.stringify([...trOff])); } catch { /* egal */ }
+    updateTrButton(t);
+    syncTranslator(t);
+    toast(trOff.has(t.login) ? 'Übersetzer für diesen Kanal aus.' : 'Übersetzer für diesen Kanal an.');
+  } });
+  t.trBtn = btn;
+  updateTrButton(t);
+  return btn;
+}
+
+function updateTrButton(t: Tab): void {
+  const btn = t.trBtn;
+  if (!btn || !t.login) return;
+  const lang = channelLang(t.login);
+  const off = trOff.has(t.login);
+  const useful = !!lang && lang !== 'de';
+  btn.hidden = !useful;
+  btn.classList.toggle('is-on', useful && !off);
+  btn.title = useful
+    ? off ? `Übersetzer aus – klicken, um deine Nachrichten ins ${lang!.toUpperCase()} zu übersetzen` : `Deine Nachrichten werden ins ${lang!.toUpperCase()} übersetzt – klicken zum Ausschalten`
+    : '';
+  btn.replaceChildren(icon('globe'), h('span', { text: useful ? `DE→${lang!.toUpperCase()}` : '' }));
 }
 
 async function resendChat(t: Tab, text: string): Promise<void> {
   if (!t.login) return;
   if (!state?.auth.loggedIn) { toast('Zum Schreiben im Chat musst du bei Twitch angemeldet sein.'); return; }
+  if (trTarget(t) && !/^[!/]/.test(text)) { await translateAndSend(t, text, false); return; }
   const r = await api.chatSend(t.login, text);
   if (r.ok) rememberChat(text);
   else toast(r.error ?? 'Senden ging nicht.');
@@ -1201,6 +1319,7 @@ function fillQuickbar(t: Tab, bar: HTMLElement): void {
     }, icon(muted ? 'mute' : 'volume'), h('span', { text: muted ? 'Stumm' : 'Ton an' })),
     vol,
     relButtons(t) ?? '',
+    trButton(t) ?? '',
     h('span', { class: 'qb-sep' }),
     h('div', { class: 'qb-msgs' },
       ...messages.map((m) => {
@@ -1222,6 +1341,8 @@ function updateQuickbars(): void {
     if (!t.qbar || !t.qbar.isConnected) continue;
     // Stumm-Knopf sofort anpassen – auch wenn er gerade den Fokus hat (sonst sprang die Anzeige erst verzögert um)
     updateMuteButton(t);
+    updateTrButton(t);
+    syncTranslator(t);
     const key = JSON.stringify([state?.quickMessages ?? [], !!state?.auth.loggedIn]);
     const focusInMsgs = !!t.qbar.querySelector('.qb-msgs')?.contains(document.activeElement);
     if (t.qbar.dataset.key !== key && !focusInMsgs) fillQuickbar(t, t.qbar);

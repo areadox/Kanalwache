@@ -137,6 +137,23 @@
         <div class="st-card">
           <div class="st-row"><span class="st-text"><span class="st-title">Schnellnachrichten</span><span class="st-desc">Knöpfe, die eine fertige Nachricht in den Chat schreiben.</span></span>
             <button type="button" class="btn small" id="btn-quick">Bearbeiten …</button></div>
+          <label class="st-row"><span class="st-text"><span class="st-title">Chat-Übersetzer</span><span class="st-desc">Was du auf Deutsch schreibst, geht übersetzt in den Chat, wenn der Kanal eine andere Sprache hat. Pro Kanal ein-/ausschaltbar über „DE→EN“ in der Schnellleiste. Befehle (!…, /…) bleiben unverändert.</span></span><input type="checkbox" class="switch" data-setting="translateChat"></label>
+          <label class="st-row"><span class="st-text"><span class="st-title">Übersetzen in</span><span class="st-desc">„Sprache des Kanals“ nimmt, was der Streamer bei Twitch eingestellt hat.</span></span>
+            <select data-setting="translateTo">
+              <option value="auto">Sprache des Kanals</option>
+              <option value="en">Englisch</option>
+              <option value="es">Spanisch</option>
+              <option value="fr">Französisch</option>
+              <option value="it">Italienisch</option>
+              <option value="nl">Niederländisch</option>
+              <option value="pl">Polnisch</option>
+              <option value="pt">Portugiesisch</option>
+              <option value="tr">Türkisch</option>
+              <option value="ru">Russisch</option>
+              <option value="ja">Japanisch</option>
+            </select></label>
+          <label class="st-row"><span class="st-text"><span class="st-title">DeepL-API-Schlüssel <span class="muted">(optional)</span></span><span class="st-desc">Ohne Schlüssel übersetzt der kostenlose Dienst MyMemory (einige tausend Zeichen am Tag). Mit einem kostenlosen „DeepL API Free“-Schlüssel wird es besser. Deine Nachrichten gehen dazu an den jeweiligen Dienst.</span></span>
+            <input type="password" class="st-input" data-setting="deeplKey" placeholder="xxxxxxxx-…:fx" autocomplete="off" spellcheck="false"></label>
           <div class="st-row"><span class="st-text"><span class="st-title">Chat-Verlauf</span><span class="st-desc">↑ im leeren Chat-Eingabefeld zeigt, was du schon geschrieben hast. Leeren kannst du ihn direkt in der Liste.</span></span></div>
         </div>
       </section>

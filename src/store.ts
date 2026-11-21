@@ -54,6 +54,12 @@ export interface Settings {
   dropsNotify: boolean;
   /** Zuschauerserie („Watch Streak“) an den Kanälen anzeigen */
   showStreaks: boolean;
+  /** Chat-Übersetzer: eigene deutsche Nachrichten in die Sprache des Kanals übersetzen */
+  translateChat: boolean;
+  /** Zielsprache: „auto“ = Sprache des Kanals laut Twitch, sonst fester Code (z. B. „en“) */
+  translateTo: string;
+  /** Optional: eigener DeepL-API-Schlüssel (sonst kostenloser Dienst MyMemory) */
+  deeplKey: string;
 }
 
 export interface QuickMessage {
@@ -128,6 +134,9 @@ export const DEFAULT_SETTINGS: Settings = {
   autoClaimDrops: false,
   dropsNotify: true,
   showStreaks: true,
+  translateChat: true,
+  translateTo: 'auto',
+  deeplKey: '',
 };
 
 const LOGIN_RE = /^[a-z0-9_]{2,25}$/;

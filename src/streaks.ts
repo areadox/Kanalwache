@@ -79,3 +79,18 @@ export async function fetchStreaks(token: string, logins: string[]): Promise<Map
   }
   return out;
 }
+
+/** Sprache, die der Kanal in Twitch eingestellt hat (z. B. „en“, „de“) – gebündelt, unbekannt → fehlt. */
+export async function fetchLanguages(token: string, logins: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const Q = 'query($l: String!) { user(login: $l) { broadcastSettings { language } } }';
+  for (let i = 0; i < logins.length; i += 30) {
+    const chunk = logins.slice(i, i + 30);
+    const res = await post(token, chunk.map((l) => ({ query: Q, variables: { l } })));
+    (Array.isArray(res) ? res : []).forEach((r: any, k: number) => {
+      const lang = r?.data?.user?.broadcastSettings?.language;
+      if (typeof lang === 'string' && /^[a-z]{2}$/i.test(lang)) out.set(chunk[k], lang.toLowerCase());
+    });
+  }
+  return out;
+}
