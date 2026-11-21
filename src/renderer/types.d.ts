@@ -244,6 +244,9 @@ interface WebviewEl extends HTMLElement {
   setAudioMuted(muted: boolean): void;
   isAudioMuted(): boolean;
   reload(): void;
+  focus(): void;
+  sendInputEvent(ev: { type: string; keyCode: string; modifiers?: string[] }): void;
+  insertText(text: string): Promise<void>;
   canGoBack(): boolean;
   goBack(): void;
   getURL(): string;

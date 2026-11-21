@@ -134,6 +134,10 @@ Nach der Anmeldung holt Kanalwache alle 2 Minuten die Benachrichtigungen deines 
 
   Außer bei Ollama/LM Studio auf deinem PC geht die Nachricht zum Übersetzen an den gewählten Dienst.
 
+## Rechtsklick
+
+In Player, Chat und Twitch-Seiten gibt es ein Rechtsklick-Menü: im Eingabefeld Rückgängig, Ausschneiden, Kopieren, Einfügen, Löschen, Alles markieren (bei Tippfehlern mit Vorschlägen); bei markiertem Text Kopieren; bei Links „Im Browser öffnen“ und „Link kopieren“; bei Bildern „Bild kopieren“.
+
 ## Chat-Verlauf
 
 Was du im Chat schreibst, merkt sich Kanalwache (die letzten 50 Nachrichten, über alle Kanäle). So schreibst du etwas nochmal, ohne es neu zu tippen:

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, Notification, session, shell, Tray, webContents } from 'electron';
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeImage, nativeTheme, Notification, session, shell, Tray, webContents } from 'electron';
 import { RecordingFiles } from './recorder';
 import { extractRaidTarget } from './raid';
 import { Updater } from './updater';
@@ -530,6 +530,42 @@ async function init(): Promise<void> {
       if (!name) return;
       e.preventDefault();
       win?.webContents.send('shortcut', name);
+    });
+    // Rechtsklick-Menü (Electron bringt in eingebetteten Seiten keins mit): Ausschneiden/Kopieren/Einfügen, Links, Bilder
+    contents.on('context-menu', (_ev, p) => {
+      const items: Electron.MenuItemConstructorOptions[] = [];
+      if (p.isEditable) {
+        if (p.misspelledWord && p.dictionarySuggestions.length) {
+          for (const sug of p.dictionarySuggestions.slice(0, 5)) items.push({ label: sug, click: () => contents.replaceMisspelling(sug) });
+          items.push({ type: 'separator' });
+        }
+        items.push(
+          { label: 'Rückgängig', role: 'undo', enabled: p.editFlags.canUndo },
+          { label: 'Wiederholen', role: 'redo', enabled: p.editFlags.canRedo },
+          { type: 'separator' },
+          { label: 'Ausschneiden', role: 'cut', enabled: p.editFlags.canCut },
+          { label: 'Kopieren', role: 'copy', enabled: p.editFlags.canCopy },
+          { label: 'Einfügen', role: 'paste', enabled: p.editFlags.canPaste },
+          { label: 'Löschen', role: 'delete', enabled: p.editFlags.canDelete },
+          { type: 'separator' },
+          { label: 'Alles markieren', role: 'selectAll' },
+        );
+      } else if (p.selectionText.trim()) {
+        items.push({ label: 'Kopieren', role: 'copy' });
+      }
+      if (p.linkURL) {
+        if (items.length) items.push({ type: 'separator' });
+        items.push(
+          { label: 'Link im Browser öffnen', click: () => { if (/^https?:\/\//.test(p.linkURL)) void shell.openExternal(p.linkURL); } },
+          { label: 'Link kopieren', click: () => clipboard.writeText(p.linkURL) },
+        );
+      }
+      if (p.mediaType === 'image' && p.srcURL) {
+        if (items.length) items.push({ type: 'separator' });
+        items.push({ label: 'Bild kopieren', click: () => contents.copyImageAt(p.x, p.y) });
+      }
+      if (!items.length) return;
+      Menu.buildFromTemplate(items).popup({ window: win ?? undefined });
     });
     contents.setWindowOpenHandler(({ url }) => {
       if (TWITCH_URL_RE.test(url)) {

@@ -876,19 +876,11 @@ function chatHistoryUi(initial: string[]): void {
     }
   };
 
+  // Text ins Eingabefeld setzen übernimmt Kanalwache mit echten Tastendrücken – Twitchs Editor (Slate)
+  // gerät durcheinander, wenn die Seite selbst Text einfügt oder löscht (danach ließ sich nichts mehr löschen).
   const insert = (text: string) => {
-    const el = input();
-    if (!el) return;
-    el.focus();
-    // Vorhandenen Text ersetzen; execCommand geht durch Twitchs Editor wie Tippen
-    document.execCommand('selectAll', false);
-    document.execCommand('insertText', false, text);
-    if ((el as HTMLTextAreaElement).value !== undefined && (el as HTMLTextAreaElement).value !== text) {
-      const ta = el as HTMLTextAreaElement;
-      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
-      setter?.call(ta, text);
-      ta.dispatchEvent(new Event('input', { bubbles: true }));
-    }
+    input()?.focus();
+    send('insert', text);
   };
 
   const render = () => {
@@ -959,7 +951,6 @@ function chatHistoryUi(initial: string[]): void {
       const text = inputText(el);
       if (text && w.__kwTr && !/^[!/]/.test(text)) {
         e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
-        clearInput();
         send('translate', text);
         return;
       }
@@ -973,26 +964,14 @@ function chatHistoryUi(initial: string[]): void {
       const text = inputText(el);
       if (text && w.__kwTr && !/^[!/]/.test(text)) {
         e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
-        clearInput();
+        input()?.focus();
         send('translate', text);
         return;
       }
       if (text) send('sent', text);
     }
   }, true);
-  function clearInput() {
-    const el = input();
-    if (!el) return;
-    el.focus();
-    document.execCommand('selectAll', false);
-    document.execCommand('delete', false);
-    if ((el as HTMLTextAreaElement).value) {
-      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
-      setter?.call(el, '');
-      el.dispatchEvent(new Event('input', { bubbles: true }));
-    }
-  }
-  w.__kwInsert = (text: string) => insert(text);
+  w.__kwFocus = () => { input()?.focus(); return !!input(); };
   /** Übersetzer an/aus: Zielsprache oder null */
   w.__kwTrSet = (lang: string | null) => { w.__kwTr = lang; };
 
@@ -1032,7 +1011,7 @@ function attachChatHistory(t: Tab, wv: WebviewEl): void {
   });
   wv.addEventListener('console-message', (e: Event) => {
     const msg = String((e as unknown as { message?: string }).message ?? '');
-    const m = msg.match(/^__kw:(sent|resend|clear|translate|intr):(.*)$/s);
+    const m = msg.match(/^__kw:(sent|resend|clear|translate|intr|insert):(.*)$/s);
     if (!m) return;
     let text = '';
     if (m[1] === 'intr') {
@@ -1042,7 +1021,8 @@ function attachChatHistory(t: Tab, wv: WebviewEl): void {
     try { text = JSON.parse(m[2]); } catch { return; }
     if (m[1] === 'clear') { chatHistory = []; saveChatHistory(); toast('Chat-Verlauf geleert.'); return; }
     if (m[1] === 'sent') { rememberChat(text); return; }
-    if (m[1] === 'translate') { void translateAndSend(t, text, true); return; }
+    if (m[1] === 'translate') { void (async () => { await clearChatInput(wv); await translateAndSend(t, text, true); })(); return; }
+    if (m[1] === 'insert') { void typeIntoChat(wv, text); return; }
     void resendChat(t, text);
   });
   wv.addEventListener('dom-ready', () => setTimeout(() => {
@@ -1208,7 +1188,7 @@ async function translateAndSend(t: Tab, text: string, fromInput: boolean): Promi
   const tr = await api.translate(text, 'de', lang, false, 'out');
   if (!tr.ok || !tr.text) {
     toast(`${tr.error ?? 'Übersetzung ging nicht.'} Die Nachricht steht wieder im Eingabefeld.`);
-    if (fromInput) void t.chat?.executeJavaScript(`window.__kwInsert && window.__kwInsert(${JSON.stringify(text)})`).catch(() => {});
+    if (fromInput && t.chat) void typeIntoChat(t.chat, text);
     return false;
   }
   const r = await api.chatSend(t.login, tr.text);
@@ -1217,7 +1197,7 @@ async function translateAndSend(t: Tab, text: string, fromInput: boolean): Promi
     toast(`Übersetzt (${lang.toUpperCase()}): ${tr.text}`);
   } else {
     toast(r.error ?? 'Senden ging nicht.');
-    if (fromInput) void t.chat?.executeJavaScript(`window.__kwInsert && window.__kwInsert(${JSON.stringify(text)})`).catch(() => {});
+    if (fromInput && t.chat) void typeIntoChat(t.chat, text);
   }
   return r.ok;
 }
@@ -1275,6 +1255,26 @@ function updateTrButton(t: Tab): void {
     ? off ? `Übersetzer aus – klicken, um deine Nachrichten ins ${lang!.toUpperCase()} zu übersetzen` : `Deine Nachrichten werden ins ${lang!.toUpperCase()} übersetzt – klicken zum Ausschalten`
     : '';
   btn.replaceChildren(icon('globe'), h('span', { text: useful ? `DE→${lang!.toUpperCase()}` : '' }));
+}
+
+/** Eingabefeld leeren wie per Hand: Strg+A, Rücktaste – echte Tastendrücke, die Twitchs Editor versteht. */
+async function clearChatInput(wv: WebviewEl): Promise<void> {
+  try {
+    const ok = await wv.executeJavaScript('window.__kwFocus ? window.__kwFocus() : false');
+    if (!ok) return;
+    wv.focus();
+    wv.sendInputEvent({ type: 'keyDown', keyCode: 'A', modifiers: ['control'] });
+    wv.sendInputEvent({ type: 'keyUp', keyCode: 'A', modifiers: ['control'] });
+    wv.sendInputEvent({ type: 'keyDown', keyCode: 'Backspace' });
+    wv.sendInputEvent({ type: 'keyUp', keyCode: 'Backspace' });
+    await new Promise((r) => setTimeout(r, 30));
+  } catch { /* Seite lädt gerade */ }
+}
+
+/** Text ins Eingabefeld schreiben (ersetzt, was drinsteht) – wie Einfügen per Tastatur */
+async function typeIntoChat(wv: WebviewEl, text: string): Promise<void> {
+  await clearChatInput(wv);
+  try { await wv.insertText(text); } catch { /* egal */ }
 }
 
 async function resendChat(t: Tab, text: string): Promise<void> {
